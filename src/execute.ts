@@ -12,6 +12,8 @@ import {
   type Session,
 } from "./types.ts";
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
  * Execute a single recording script against a real tmux + asciinema session.
  *
@@ -65,7 +67,7 @@ export async function executeRecording(
     // Keep the session alive so asciinema records idle time for the last frame.
     // The 50ms base covers asciinema's ~25ms capture interval.
     const trailing = Math.max(0, opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS);
-    await Bun.sleep(50 + trailing);
+    await sleep(50 + trailing);
   } finally {
     // Disconnect control mode before killing sessions
     await srv.disconnect();

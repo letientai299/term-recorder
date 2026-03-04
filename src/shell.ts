@@ -1,4 +1,8 @@
-import { $ } from "bun";
+import {
+  execFile as nodeExecFile,
+  spawn as nodeSpawn,
+} from "node:child_process";
+import { Readable } from "node:stream";
 
 /** Thrown when a tmux command exits with a non-zero status. */
 export class TmuxError extends Error {
@@ -43,7 +47,12 @@ class LineReader {
           this.buffer = parts.pop() ?? "";
           for (const line of parts) {
             this.lines.push(line);
-            this.resolve?.();
+            if (this.resolve) {
+              const cb = this.resolve;
+              this.resolve = undefined;
+              this.reject = undefined;
+              cb();
+            }
           }
         }
       } catch {
@@ -118,8 +127,16 @@ export function quoteCcArg(arg: string): string {
  * Most users don't interact with this class directly — {@link main} and
  * {@link executeRecording} manage server lifecycle automatically.
  */
+/** Minimal process handle shared between Bun.spawn and node:child_process. */
+interface TmuxProc {
+  stdin: { write(data: string): void; end(): void };
+  stdout: ReadableStream<Uint8Array>;
+  exited: Promise<number>;
+  kill(): void;
+}
+
 export class TmuxServer {
-  private proc?: import("bun").Subprocess<"pipe", "pipe", "pipe">;
+  private proc?: TmuxProc;
   private reader?: LineReader;
   private connected = false;
   private commandLock = Promise.resolve();
@@ -161,11 +178,17 @@ export class TmuxServer {
       "-t",
       sessionName,
     ];
-    this.proc = Bun.spawn(args, {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
+    const cp = nodeSpawn(args[0]!, args.slice(1), {
+      stdio: ["pipe", "pipe", "pipe"],
     });
+    this.proc = {
+      stdin: cp.stdin!,
+      stdout: Readable.toWeb(cp.stdout!) as ReadableStream<Uint8Array>,
+      exited: new Promise<number>((r) =>
+        cp.on("exit", (code) => r(code ?? 1)),
+      ),
+      kill: () => cp.kill(),
+    };
     this.reader = new LineReader(this.proc.stdout);
     this.connected = true;
 
@@ -298,19 +321,21 @@ export class TmuxServer {
   }
 
   /** Subprocess fallback for commands outside a control mode session. */
-  private async subprocessCommand(...args: string[]): Promise<string> {
+  private subprocessCommand(...args: string[]): Promise<string> {
     const prefix: string[] = ["-L", this.socketName];
     if (!this.userConf) prefix.push("-f", "/dev/null");
     const fullArgs = [...prefix, ...args];
-    const result = await $`tmux ${fullArgs}`.quiet().nothrow();
-    if (result.exitCode !== 0) {
-      throw new TmuxError(
-        fullArgs,
-        result.exitCode,
-        result.stderr.toString().trim(),
-      );
-    }
-    return result.stdout.toString().trim();
+    return new Promise<string>((resolve, reject) => {
+      nodeExecFile("tmux", fullArgs, (err, stdout, stderr) => {
+        if (err) {
+          const exitCode =
+            typeof err.code === "number" ? err.code : (err as any).status ?? 1;
+          reject(new TmuxError(fullArgs, exitCode, stderr.trim()));
+        } else {
+          resolve(stdout.trim());
+        }
+      });
+    });
   }
 
   /**

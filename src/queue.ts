@@ -10,6 +10,8 @@ import {
   waitForTitle,
 } from "./wait.ts";
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export interface QueueConfig {
   typingDelay: number;
   actionDelay: number;
@@ -47,7 +49,7 @@ export class ActionQueue {
       await this.execute(action);
       // Auto-pause between actions (skip for sleep — already a pause)
       if (action.kind !== "sleep" && this.cfg.actionDelay > 0) {
-        await Bun.sleep(this.cfg.actionDelay);
+        await sleep(this.cfg.actionDelay);
       }
     }
   }
@@ -73,7 +75,7 @@ export class ActionQueue {
       const delay = a.delayMs ?? this.cfg.typingDelay;
       for (const char of a.text) {
         await sendKeys(this.server, a.pane, char);
-        await Bun.sleep(delay);
+        await sleep(delay);
       }
     },
     key: async (a) => {
@@ -83,7 +85,7 @@ export class ActionQueue {
       await sendKeys(this.server, a.pane, "\r", false);
     },
     sleep: async (a) => {
-      await Bun.sleep(a.ms);
+      await sleep(a.ms);
     },
     waitForText: async (a) => {
       await waitForText(this.server, a.pane, a.text, a.timeout);

@@ -1,4 +1,8 @@
+import { afterAll, beforeAll } from "bun:test";
 import { readFileSync } from "node:fs";
+import { createSession, killSession } from "./session.ts";
+import { TmuxServer } from "./shell.ts";
+import { pollPane } from "./wait.ts";
 
 interface CastHeaderV2 {
   version: 2;
@@ -69,4 +73,29 @@ export function castHeader(path: string): CastHeader {
  */
 export function testSessionName(): string {
   return `test-${process.pid}-${Date.now()}`;
+}
+
+/**
+ * Set up a tmux session with beforeAll/afterAll lifecycle hooks.
+ * Returns the server, session name, and default pane target.
+ */
+export function useTmuxSession(socketName: string): {
+  server: TmuxServer;
+  sessionName: string;
+  target: string;
+} {
+  const server = new TmuxServer(socketName);
+  const sessionName = testSessionName();
+  const target = `${sessionName}:0.0`;
+
+  beforeAll(async () => {
+    await createSession(server, sessionName);
+    await pollPane(server, target, (c) => c.trim().length > 0, 5000, "shell ready");
+  });
+
+  afterAll(async () => {
+    await killSession(server, sessionName);
+  });
+
+  return { server, sessionName, target };
 }

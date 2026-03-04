@@ -57,3 +57,19 @@ export async function capturePane(
 ): Promise<string> {
   return server.tmux("capture-pane", "-t", target, "-p", "-S", "-");
 }
+
+/**
+ * Get the pane title set by the running program via ANSI escape sequences.
+ */
+export async function getPaneTitle(
+  server: TmuxServer,
+  target: string,
+): Promise<string> {
+  return server.tmux(
+    "display-message",
+    "-t",
+    target,
+    "-p",
+    "#{pane_title}",
+  );
+}

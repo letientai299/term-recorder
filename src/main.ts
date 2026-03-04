@@ -53,7 +53,8 @@ export function parseCliFlags(argv: string[]): CliFlags {
   };
 }
 
-function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
+/** @internal */
+export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
   const mode = cli.headless ? "headless" : (config.mode ?? "headful");
   return {
     mode,

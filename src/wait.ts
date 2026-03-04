@@ -1,4 +1,4 @@
-import { capturePane } from "./pane.ts";
+import { capturePane, getPaneTitle } from "./pane.ts";
 import type { TmuxServer } from "./shell.ts";
 
 const DEFAULT_TIMEOUT = 10_000;
@@ -65,6 +65,26 @@ export async function waitForPrompt(
     },
     timeout,
     `waitForPrompt("${prompt}")`,
+  );
+}
+
+/**
+ * Poll until the pane title contains `title`.
+ */
+export async function waitForTitle(
+  server: TmuxServer,
+  target: string,
+  title: string,
+  timeout = DEFAULT_TIMEOUT,
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const current = await getPaneTitle(server, target);
+    if (current.includes(title)) return;
+    await Bun.sleep(POLL_INTERVAL);
+  }
+  throw new Error(
+    `waitForTitle("${title}") timed out after ${timeout}ms on ${target}`,
   );
 }
 

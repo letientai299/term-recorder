@@ -31,14 +31,14 @@ export const KEYS: Record<string, string> = {
 
 /**
  * Produce a Ctrl+key escape sequence from a single character.
- * Pass the result to {@link Pane.type} (not `type` — control sequences
+ * Pass the result to {@link Pane.send} (not `type` — control sequences
  * should be sent instantly).
  *
  * @example
  * ```ts
- * s.type(ctrl("c")); // Ctrl+C — interrupt
- * s.type(ctrl("a")); // Ctrl+A — tmux prefix or beginning of line
- * s.type(ctrl("l")); // Ctrl+L — clear screen
+ * s.send(ctrl("c")); // Ctrl+C — interrupt
+ * s.send(ctrl("a")); // Ctrl+A — tmux prefix or beginning of line
+ * s.send(ctrl("l")); // Ctrl+L — clear screen
  * ```
  *
  * Accepts `A`–`Z` (case-insensitive) and `@[\]^_`.

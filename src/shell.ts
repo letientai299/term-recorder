@@ -72,7 +72,8 @@ class LineReader {
  * Args containing spaces, special chars, or tmux format sequences
  * must be wrapped in single quotes with internal quotes escaped.
  */
-function quoteCcArg(arg: string): string {
+/** @internal */
+export function quoteCcArg(arg: string): string {
   if (arg.length === 0) return "''";
   if (/[\s"'\\#{}$;~]/.test(arg) || arg.startsWith("-")) {
     return `'${arg.replace(/'/g, "'\\''")}'`;

@@ -86,11 +86,7 @@ async function startHeadless(
   env: Record<string, string>,
 ): Promise<void> {
   const captureName = captureSessionName(mainSession);
-  await createSession(server, captureName);
-
-  for (const [key, value] of Object.entries(env)) {
-    await server.tmux("set-environment", "-t", captureName, key, value);
-  }
+  await createSession(server, captureName, { env });
   await server.tmux("respawn-pane", "-t", `${captureName}:0.0`, "-k");
   await waitForPaneContent(server, `${captureName}:0.0`, 5_000, "respawn-pane");
 

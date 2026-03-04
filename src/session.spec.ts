@@ -28,18 +28,10 @@ describe("session lifecycle", () => {
     expect(panes[0]).toBe("0");
   });
 
-  test("split creates new pane", async () => {
+  test.each(["h", "v"] as const)("%s split creates new pane", async (dir) => {
     const name = tracked();
     await createSession(server, name);
-    await splitPane(server, name, "h", 50);
-    const panes = await listPanes(server, name);
-    expect(panes).toHaveLength(2);
-  });
-
-  test("vertical split", async () => {
-    const name = tracked();
-    await createSession(server, name);
-    await splitPane(server, name, "v", 50);
+    await splitPane(server, name, dir, 50);
     const panes = await listPanes(server, name);
     expect(panes).toHaveLength(2);
   });

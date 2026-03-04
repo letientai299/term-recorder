@@ -82,9 +82,9 @@ describe("createSessionProxy", () => {
     expect(split.session).toBe("test-session");
     expect(split.percent).toBe(50);
     expect(split.placeholder).toBeString();
-    // The type action targets the same placeholder — resolved at drain time
-    const typeAction = queue.actions[1] as ActionOf<"type">;
-    expect(typeAction.pane).toBe(split.placeholder as string);
-    expect(typeAction.text).toBe("in pane 2");
+    // The send action targets the same placeholder — resolved at drain time
+    const sendAction = queue.actions[1] as ActionOf<"send">;
+    expect(sendAction.pane).toBe(split.placeholder as string);
+    expect(sendAction.text).toBe("in pane 2");
   });
 });

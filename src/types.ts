@@ -1,8 +1,8 @@
-/** 120 WPM × 5 chars/word ÷ 60s = 10 chars/s → 100ms per char */
-export const DEFAULT_TYPING_DELAY_MS = 100;
+/** 160 WPM × 5 chars/word ÷ 60s = 10 chars/s → 75ms per char */
+export const DEFAULT_TYPING_DELAY_MS = 75;
 
 /** Auto-pause between actions (ms). 0 = no pause. */
-export const DEFAULT_ACTION_DELAY_MS = 300;
+export const DEFAULT_ACTION_DELAY_MS = 200;
 
 /**
  * Low-level options for {@link executeRecording}.
@@ -14,9 +14,9 @@ export interface RecordOptions {
   mode?: "headful" | "headless";
   /** Shell to launch inside tmux panes. Default: inherited from `$SHELL`. */
   shell?: string;
-  /** Per-char delay for {@link Pane.type} in ms. Default: 100 (~120 WPM). */
+  /** Per-char delay for {@link Pane.type} in ms. Default: {@link DEFAULT_TYPING_DELAY_MS}  */
   typingDelay?: number;
-  /** Auto-pause between actions in ms. Negative values become 0. Default: 300. */
+  /** Auto-pause between actions in ms. Negative values become 0. Default: {@link DEFAULT_ACTION_DELAY_MS}. */
   actionDelay?: number;
   /** Load user's `tmux.conf`. Default: false (clean tmux with no user config). */
   loadTmuxConf?: boolean;
@@ -42,6 +42,7 @@ export interface ActionDefs {
   sleep: { ms: number };
   waitForText: { pane: string; text: string; timeout?: number };
   waitForPrompt: { pane: string; prompt: string; timeout?: number };
+  waitForTitle: { pane: string; title: string; timeout?: number };
   splitH: { session: string; percent?: number; placeholder?: string };
   splitV: { session: string; percent?: number; placeholder?: string };
 }
@@ -91,7 +92,7 @@ export interface Pane {
   sleep(ms: number): Pane;
   /**
    * Block until `text` appears anywhere in the pane content.
-   * Polls every 200ms via `capture-pane`.
+   * Polls every 100ms via `capture-pane`.
    * @param text - Substring to search for.
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
@@ -103,6 +104,14 @@ export interface Pane {
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
   waitForPrompt(prompt: string, timeout?: number): Pane;
+  /**
+   * Block until the tmux pane title contains `title`.
+   * Polls every 100ms via `display-message #{pane_title}`.
+   * Useful for programs that set the terminal title (e.g. Claude Code).
+   * @param title - Substring to match in the pane title.
+   * @param timeout - Max wait time in ms. Default: 10 000.
+   */
+  waitForTitle(title: string, timeout?: number): Pane;
 }
 
 /**

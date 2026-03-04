@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseCliFlags } from "./main.ts";
+import { parseCliFlags, resolveOptions } from "./main.ts";
 
 describe("parseCliFlags", () => {
   test("defaults", () => {
@@ -78,5 +78,54 @@ describe("parseCliFlags", () => {
   test("invalid numeric values return undefined", () => {
     expect(parseCliFlags(["--parallel", "abc"]).parallel).toBeUndefined();
     expect(parseCliFlags(["--parallel", "0"]).parallel).toBeUndefined();
+  });
+});
+
+const defaultCli = parseCliFlags([]);
+
+describe("resolveOptions", () => {
+  test("defaults with empty config", () => {
+    const opts = resolveOptions({}, defaultCli);
+    expect(opts.mode).toBe("headful");
+    expect(opts.loadTmuxConf).toBe(false);
+    expect(opts.loadAsciinemaConf).toBe(false);
+  });
+
+  test("--headless CLI flag overrides config mode", () => {
+    const cli = parseCliFlags(["--headless"]);
+    const opts = resolveOptions({ mode: "headful" }, cli);
+    expect(opts.mode).toBe("headless");
+  });
+
+  test("config mode used when CLI does not set headless", () => {
+    const opts = resolveOptions({ mode: "headless" }, defaultCli);
+    expect(opts.mode).toBe("headless");
+  });
+
+  test("CLI loadTmuxConf OR config loadTmuxConf", () => {
+    expect(resolveOptions({ loadTmuxConf: true }, defaultCli).loadTmuxConf).toBe(true);
+    const cli = parseCliFlags(["--load-tmux-conf"]);
+    expect(resolveOptions({}, cli).loadTmuxConf).toBe(true);
+    expect(resolveOptions({ loadTmuxConf: false }, cli).loadTmuxConf).toBe(true);
+  });
+
+  test("passes through config fields", () => {
+    const opts = resolveOptions(
+      {
+        shell: "/bin/zsh",
+        typingDelay: 50,
+        actionDelay: 100,
+        tmux: { options: { "status-style": "bg=red" } },
+        env: { FOO: "bar" },
+        cwd: "/tmp",
+      },
+      defaultCli,
+    );
+    expect(opts.shell).toBe("/bin/zsh");
+    expect(opts.typingDelay).toBe(50);
+    expect(opts.actionDelay).toBe(100);
+    expect(opts.tmux?.options?.["status-style"]).toBe("bg=red");
+    expect(opts.env?.FOO).toBe("bar");
+    expect(opts.cwd).toBe("/tmp");
   });
 });

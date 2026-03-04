@@ -2,7 +2,7 @@ import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import type { Action, Pane, Session } from "./types.ts";
-import { exec, waitForPrompt, waitForText } from "./wait.ts";
+import { exec, waitForPrompt, waitForText, } from "./wait.ts";
 
 export interface QueueConfig {
   typingDelay: number;
@@ -112,26 +112,20 @@ export class ActionQueue {
         );
         log(this.cfg, `waitForPrompt found`);
         break;
-      case "splitH": {
-        log(this.cfg, `splitH ${action.percent ?? ""}% → ${action.session}`);
-        const hId = await splitPane(
-          this.server,
-          action.session,
-          "h",
-          action.percent,
-        );
-        this.resolvePlaceholder(action.placeholder, hId.trim());
-        break;
-      }
+      case "splitH":
       case "splitV": {
-        log(this.cfg, `splitV ${action.percent ?? ""}% → ${action.session}`);
-        const vId = await splitPane(
+        const dir = action.kind === "splitH" ? "h" : "v";
+        log(
+          this.cfg,
+          `${action.kind} ${action.percent ?? ""}% → ${action.session}`,
+        );
+        const id = await splitPane(
           this.server,
           action.session,
-          "v",
+          dir,
           action.percent,
         );
-        this.resolvePlaceholder(action.placeholder, vId.trim());
+        this.resolvePlaceholder(action.placeholder, id.trim());
         break;
       }
     }
@@ -172,6 +166,10 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "waitForPrompt", pane: target, prompt, timeout });
       return api;
     },
+    waitForTitle(title: string, timeout?: number) {
+      queue.push({ kind: "waitForTitle", pane: target, title, timeout });
+      return api;
+    },
   };
   return api;
 }
@@ -183,32 +181,20 @@ export function createSessionProxy(
   const defaultTarget = `${sessionName}:0.0`;
   const pane = createPaneProxy(queue, defaultTarget);
 
+  function split(kind: "splitH" | "splitV", percent?: number): Pane {
+    const placeholder = nextPlaceholder();
+    queue.push({ kind, session: sessionName, percent, placeholder });
+    return createPaneProxy(queue, placeholder);
+  }
+
   const api: Session = {
     ...pane,
     sleep(ms: number) {
       queue.push({ kind: "sleep", ms });
       return api;
     },
-    splitH(percent?: number): Pane {
-      const placeholder = nextPlaceholder();
-      queue.push({
-        kind: "splitH",
-        session: sessionName,
-        percent,
-        placeholder,
-      });
-      return createPaneProxy(queue, placeholder);
-    },
-    splitV(percent?: number): Pane {
-      const placeholder = nextPlaceholder();
-      queue.push({
-        kind: "splitV",
-        session: sessionName,
-        percent,
-        placeholder,
-      });
-      return createPaneProxy(queue, placeholder);
-    },
+    splitH: (percent?: number) => split("splitH", percent),
+    splitV: (percent?: number) => split("splitV", percent),
   };
   return api;
 }

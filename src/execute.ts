@@ -68,7 +68,10 @@ export async function executeRecording(
 
     // Keep the session alive so asciinema records idle time for the last frame.
     // The 50ms base covers asciinema's ~25ms capture interval.
-    const trailing = Math.max(0, opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS);
+    const trailing = Math.max(
+      0,
+      opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS,
+    );
     await sleep(50 + trailing);
   } finally {
     // Disconnect control mode before killing sessions

@@ -31,10 +31,7 @@ describe("parseCliFlags", () => {
   });
 
   test("--load-tmux-conf and --load-asciinema-conf", () => {
-    const flags = parseCliFlags([
-      "--load-tmux-conf",
-      "--load-asciinema-conf",
-    ]);
+    const flags = parseCliFlags(["--load-tmux-conf", "--load-asciinema-conf"]);
     expect(flags.loadTmuxConf).toBe(true);
     expect(flags.loadAsciinemaConf).toBe(true);
   });
@@ -91,10 +88,14 @@ describe("resolveOptions", () => {
   });
 
   test("CLI loadTmuxConf OR config loadTmuxConf", () => {
-    expect(resolveOptions({ loadTmuxConf: true }, defaultCli).loadTmuxConf).toBe(true);
+    expect(
+      resolveOptions({ loadTmuxConf: true }, defaultCli).loadTmuxConf,
+    ).toBe(true);
     const cli = parseCliFlags(["--load-tmux-conf"]);
     expect(resolveOptions({}, cli).loadTmuxConf).toBe(true);
-    expect(resolveOptions({ loadTmuxConf: false }, cli).loadTmuxConf).toBe(true);
+    expect(resolveOptions({ loadTmuxConf: false }, cli).loadTmuxConf).toBe(
+      true,
+    );
   });
 
   test("passes through config fields", () => {

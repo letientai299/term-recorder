@@ -21,15 +21,12 @@ describe("record (lazy)", () => {
     },
   );
 
-  test.each([
-    "foo$(whoami)",
-    "foo; rm -rf /",
-    'foo"bar',
-    "foo bar",
-    "foo`id`",
-  ])("rejects shell metacharacter name %s", (name) => {
-    expect(() => record(name, noop)).toThrow("Invalid recording name");
-  });
+  test.each(["foo$(whoami)", "foo; rm -rf /", 'foo"bar', "foo bar", "foo`id`"])(
+    "rejects shell metacharacter name %s",
+    (name) => {
+      expect(() => record(name, noop)).toThrow("Invalid recording name");
+    },
+  );
 
   test("rejects path traversal", () => {
     expect(() => record("../../etc/evil", noop)).toThrow("path traversal");

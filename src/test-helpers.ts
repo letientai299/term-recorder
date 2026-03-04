@@ -91,7 +91,13 @@ export function useTmuxSession(socketName: string): {
   beforeAll(async () => {
     await createSession(server, sessionName);
     await server.connect(sessionName);
-    await pollPane(server, target, (c) => c.trim().length > 0, 5000, "shell ready");
+    await pollPane(
+      server,
+      target,
+      (c) => c.trim().length > 0,
+      5000,
+      "shell ready",
+    );
   });
 
   afterAll(async () => {

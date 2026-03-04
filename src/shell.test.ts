@@ -17,16 +17,21 @@ describe("quoteCcArg", () => {
     expect(quoteCcArg("hello world")).toBe("'hello world'");
   });
 
-  test.each(["'", '"', "\\", "#", "$", "~"])(
+  test.each(['"', "\\", "#", "$", "~"])(
     "brace-quotes args containing %s",
     (char) => {
       expect(quoteCcArg(`a${char}b`)).toBe(`{a${char}b}`);
     },
   );
 
-  test("single-quotes args containing semicolons (tmux parses {;} as command block)", () => {
-    expect(quoteCcArg("a;b")).toBe("'a;b'");
-  });
+  test.each(["'", ";"])(
+    "single-quotes args containing %s (breaks tmux brace quoting)",
+    (char) => {
+      expect(quoteCcArg(`a${char}b`)).toBe(
+        `'a${char === "'" ? "'\\''" : char}b'`,
+      );
+    },
+  );
 
   test.each([
     ["#{pane_id}", "'#{pane_id}'"],

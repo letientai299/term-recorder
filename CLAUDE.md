@@ -1,6 +1,7 @@
 ---
-description: Use Bun as the dev toolchain, but keep library code runtime-agnostic.
-globs: '*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json'
+description:
+  Use Bun as the dev toolchain, but keep library code runtime-agnostic.
+globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: false
 ---
 
@@ -25,8 +26,8 @@ must stay runtime-agnostic (Node.js, Deno, Bun).
 
 ## Testing
 
-Use `bun test` to run tests. Test files may use `bun:test` and Bun-specific
-APIs since they don't ship to consumers.
+Use `bun test` to run tests. Test files may use `bun:test` and Bun-specific APIs
+since they don't ship to consumers.
 
 ```ts#index.test.ts
 import { test, expect } from "bun:test";

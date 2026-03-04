@@ -68,11 +68,5 @@ export async function getPaneTitle(
   server: TmuxServer,
   target: string,
 ): Promise<string> {
-  return server.tmux(
-    "display-message",
-    "-t",
-    target,
-    "-p",
-    "#{pane_title}",
-  );
+  return server.tmux("display-message", "-t", target, "-p", "#{pane_title}");
 }

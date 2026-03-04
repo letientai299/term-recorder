@@ -12,17 +12,19 @@ const py = record("python-repl", (s) => {
 });
 
 const vim = record("vim-edit", (s) => {
-  s.detectPrompt();
-  s.reply("echo 'hello world' > /tmp/tr-test.txt");
+  s.run("echo 'hello world' > /tmp/tr-test.txt");
+  s.waitForPrompt("❯");
   s.run("vim /tmp/tr-test.txt");
   s.key("Down");
   s.type("o");
   s.type("added by term-recorder");
   s.key("Escape");
   s.run(":wq");
+  s.waitForPrompt("❯");
   s.run("cat /tmp/tr-test.txt");
+  s.waitForPrompt("❯");
   s.pace(0);
-  s.reply("rm /tmp/tr-test.txt");
+  s.run("rm /tmp/tr-test.txt");
 });
 
 const less = record("less-pager", (s) => {
@@ -31,7 +33,6 @@ const less = record("less-pager", (s) => {
   s.key("Space");
   s.type("/150").enter();
   s.type("q");
-  s.pace(0);
 });
 
 const recordings = [py, vim, less];

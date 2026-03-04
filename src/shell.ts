@@ -188,9 +188,7 @@ export class TmuxServer {
     this.proc = {
       stdin: cp.stdin,
       stdout: Readable.toWeb(cp.stdout) as ReadableStream<Uint8Array>,
-      exited: new Promise<number>((r) =>
-        cp.on("exit", (code) => r(code ?? 1)),
-      ),
+      exited: new Promise<number>((r) => cp.on("exit", (code) => r(code ?? 1))),
       kill: () => cp.kill(),
     };
     this.reader = new LineReader(this.proc.stdout);
@@ -335,7 +333,7 @@ export class TmuxServer {
           const exitCode =
             typeof err.code === "number"
               ? err.code
-              : (err as unknown as { status?: number }).status ?? 1;
+              : ((err as unknown as { status?: number }).status ?? 1);
           reject(new TmuxError(fullArgs, exitCode, stderr.trim()));
         } else {
           resolve(stdout.trim());

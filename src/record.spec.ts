@@ -15,9 +15,9 @@ describe("record (e2e)", () => {
       CAST_FILE,
       { mode: "headless", trailingDelay: 0, pace: 0 },
       (s) => {
-      s.type("echo hello-from-record").enter();
-      s.sleep(1);
-    },
+        s.type("echo hello-from-record").enter();
+        s.sleep(1);
+      },
     );
 
     expect(existsSync(CAST_FILE)).toBe(true);

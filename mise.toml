@@ -8,8 +8,3 @@ description = "Lint and auto-fix"
 [tasks.fmt]
 run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
-
-[tasks.record]
-raw = true
-run = "bun examples/main.ts \"$@\""
-description = "Record demos (pass --headless, --filter, etc.)"

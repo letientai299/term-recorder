@@ -7,8 +7,9 @@ produce [asciicast][asciicast] files you can play back with
 ## Requirements
 
 - [Bun][bun] (runtime)
-- [tmux][tmux] (session management)
-- [asciinema][asciinema] (recording)
+- [tmux][tmux] 3.4+ (session management — uses control mode subscriptions and
+  `capture-pane -T`)
+- [asciinema][asciinema] 2.0+ (recording — uses `rec --overwrite`)
 
 ## Install
 
@@ -49,7 +50,7 @@ Output lands in `./casts/hello.cast` by default. Play it back:
 asciinema play casts/hello.cast
 ```
 
-[asciicast]: https://docs.asciinema.org/manual/asciicast/v2/
+[asciicast]: https://docs.asciinema.org/manual/asciicast/v3/
 [asciinema]: https://asciinema.org
 [bun]: https://bun.sh
 [tmux]: https://github.com/tmux/tmux

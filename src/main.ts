@@ -55,18 +55,13 @@ export function parseCliFlags(argv: string[]): CliFlags {
 
 /** @internal */
 export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
-  const mode = cli.headless ? "headless" : (config.mode ?? "headful");
+  const { outputDir: _, ...base } = config;
   return {
-    mode,
-    shell: config.shell,
-    typingDelay: config.typingDelay,
-    actionDelay: config.actionDelay,
+    ...base,
+    mode: cli.headless ? "headless" : (config.mode ?? "headful"),
     loadTmuxConf: cli.loadTmuxConf || (config.loadTmuxConf ?? false),
     loadAsciinemaConf:
       cli.loadAsciinemaConf || (config.loadAsciinemaConf ?? false),
-    tmux: config.tmux,
-    env: config.env,
-    cwd: config.cwd,
   };
 }
 

@@ -32,20 +32,21 @@ export async function sendKeys(
 }
 
 /**
- * Send a named key (from the KEYS map) or raw escape sequence.
+ * Send a named key using tmux key names (e.g. "Enter", "Up", "BSpace").
+ * Keys are sent without `-l` so tmux translates them to the appropriate
+ * escape sequences for the pane's terminal.
  */
 export async function sendKey(
   server: TmuxServer,
   target: string,
   keyName: string,
 ): Promise<void> {
-  const seq = KEYS[keyName];
-  if (!seq)
+  const tmuxName = KEYS[keyName];
+  if (!tmuxName)
     throw new Error(
       `Unknown key: "${keyName}". Available: ${Object.keys(KEYS).join(", ")}`,
     );
-  // Escape sequences must be sent without -l so tmux interprets them
-  await server.tmux("send-keys", "-t", target, seq);
+  await server.tmux("send-keys", "-t", target, tmuxName);
 }
 
 /**

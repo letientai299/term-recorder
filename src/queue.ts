@@ -1,8 +1,14 @@
 import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
-import type { Action, Pane, Session } from "./types.ts";
-import { detectPrompt, exec, waitForPrompt, waitForText, } from "./wait.ts";
+import type { Action, ActionKind, ActionOf, Pane, Session } from "./types.ts";
+import {
+  detectPrompt,
+  exec,
+  waitForPrompt,
+  waitForText,
+  waitForTitle,
+} from "./wait.ts";
 
 export interface QueueConfig {
   typingDelay: number;
@@ -59,92 +65,84 @@ export class ActionQueue {
     }
   }
 
+  private handlers: { [K in ActionKind]: (a: ActionOf<K>) => Promise<void> } = {
+    send: async (a) => {
+      await sendKeys(this.server, a.pane, a.text);
+    },
+    type: async (a) => {
+      const delay = a.delayMs ?? this.cfg.typingDelay;
+      for (const char of a.text) {
+        await sendKeys(this.server, a.pane, char);
+        await Bun.sleep(delay);
+      }
+    },
+    key: async (a) => {
+      await sendKey(this.server, a.pane, a.name);
+    },
+    enter: async (a) => {
+      await sendKeys(this.server, a.pane, "\r", false);
+    },
+    exec: async (a) => {
+      await exec(this.server, a.pane, a.cmd, a.timeout);
+    },
+    sleep: async (a) => {
+      await Bun.sleep(a.ms);
+    },
+    waitForText: async (a) => {
+      await waitForText(this.server, a.pane, a.text, a.timeout);
+    },
+    waitForPrompt: async (a) => {
+      const prompt = a.prompt ?? this.prompts.get(a.pane);
+      if (prompt == null) {
+        throw new Error(
+          `waitForPrompt on ${a.pane}: no prompt given and none detected — call detectPrompt() first`,
+        );
+      }
+      await waitForPrompt(this.server, a.pane, prompt, a.timeout);
+    },
+    detectPrompt: async (a) => {
+      const detected = await detectPrompt(this.server, a.pane, a.timeout);
+      this.prompts.set(a.pane, detected);
+    },
+    waitForTitle: async (a) => {
+      await waitForTitle(this.server, a.pane, a.title, a.timeout);
+    },
+    splitV: async (a) => {
+      const id = await splitPane(this.server, a.session, "v", a.percent);
+      this.resolvePlaceholder(a.placeholder, id.trim());
+    },
+    splitH: async (a) => {
+      const id = await splitPane(this.server, a.session, "h", a.percent);
+      this.resolvePlaceholder(a.placeholder, id.trim());
+    },
+  };
+
+  private logAction(action: Action): void {
+    const detail =
+      "text" in action
+        ? `"${action.text}"`
+        : "cmd" in action
+          ? `"${action.cmd}"`
+          : "name" in action
+            ? action.name
+            : "title" in action
+              ? `"${action.title}"`
+              : "ms" in action
+                ? `${action.ms}ms`
+                : "";
+    const target =
+      "pane" in action
+        ? `→ ${action.pane}`
+        : "session" in action
+          ? `→ ${action.session}`
+          : "";
+    log(this.cfg, [action.kind, detail, target].filter(Boolean).join(" "));
+  }
+
   private async execute(action: Action): Promise<void> {
-    switch (action.kind) {
-      case "send":
-        log(this.cfg, `send "${action.text}" → ${action.pane}`);
-        await sendKeys(this.server, action.pane, action.text);
-        break;
-      case "type": {
-        const delay = action.delayMs ?? this.cfg.typingDelay;
-        log(
-          this.cfg,
-          `type "${action.text}" (${delay}ms/char) → ${action.pane}`,
-        );
-        for (const char of action.text) {
-          await sendKeys(this.server, action.pane, char);
-          await Bun.sleep(delay);
-        }
-        break;
-      }
-      case "key":
-        log(this.cfg, `key ${action.name} → ${action.pane}`);
-        await sendKey(this.server, action.pane, action.name);
-        break;
-      case "enter":
-        log(this.cfg, `enter → ${action.pane}`);
-        await sendKeys(this.server, action.pane, "\r", false);
-        break;
-      case "exec":
-        log(this.cfg, `exec "${action.cmd}" → ${action.pane}`);
-        await exec(this.server, action.pane, action.cmd, action.timeout);
-        log(this.cfg, `exec done`);
-        break;
-      case "sleep":
-        log(this.cfg, `sleep ${action.ms}ms`);
-        await Bun.sleep(action.ms);
-        break;
-      case "waitForText":
-        log(this.cfg, `waitForText "${action.text}" → ${action.pane}`);
-        await waitForText(
-          this.server,
-          action.pane,
-          action.text,
-          action.timeout,
-        );
-        log(this.cfg, `waitForText found`);
-        break;
-      case "waitForPrompt": {
-        const prompt =
-          action.prompt ?? this.prompts.get(action.pane);
-        if (prompt == null) {
-          throw new Error(
-            `waitForPrompt on ${action.pane}: no prompt given and none detected — call detectPrompt() first`,
-          );
-        }
-        log(this.cfg, `waitForPrompt "${prompt}" → ${action.pane}`);
-        await waitForPrompt(this.server, action.pane, prompt, action.timeout);
-        log(this.cfg, `waitForPrompt found`);
-        break;
-      }
-      case "detectPrompt": {
-        log(this.cfg, `detectPrompt → ${action.pane}`);
-        const detected = await detectPrompt(
-          this.server,
-          action.pane,
-          action.timeout,
-        );
-        this.prompts.set(action.pane, detected);
-        log(this.cfg, `detectPrompt found "${detected}"`);
-        break;
-      }
-      case "splitH":
-      case "splitV": {
-        const dir = action.kind === "splitH" ? "h" : "v";
-        log(
-          this.cfg,
-          `${action.kind} ${action.percent ?? ""}% → ${action.session}`,
-        );
-        const id = await splitPane(
-          this.server,
-          action.session,
-          dir,
-          action.percent,
-        );
-        this.resolvePlaceholder(action.placeholder, id.trim());
-        break;
-      }
-    }
+    this.logAction(action);
+    const handler = this.handlers[action.kind];
+    await (handler as (a: Action) => Promise<void>)(action);
   }
 }
 

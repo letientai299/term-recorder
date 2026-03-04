@@ -86,16 +86,16 @@ export interface Pane {
    * Internally wraps the command in a subshell with an EXIT trap that signals
    * tmux `wait-for`, so pipes, semicolons, and compound commands all work.
    * @param cmd - Shell command to execute.
-   * @param timeout - Max wait time in ms. Default: 10 000.
+   * @param timeout - Max wait time in ms. Default: 5 000.
    */
   exec(cmd: string, timeout?: number): Pane;
   /** Pause for a fixed duration. Does not add an extra {@link Config.actionDelay} after itself. */
   sleep(ms: number): Pane;
   /**
    * Block until `text` appears anywhere in the pane content.
-   * Polls every 100ms via `capture-pane`.
+   * Re-checks on `%output` notifications with a 500ms fallback poll.
    * @param text - Substring to search for.
-   * @param timeout - Max wait time in ms. Default: 10 000.
+   * @param timeout - Max wait time in ms. Default: 5 000.
    */
   waitForText(text: string, timeout?: number): Pane;
   /**
@@ -103,22 +103,22 @@ export interface Pane {
    * Useful for waiting until a shell or REPL is ready for input.
    * When called with no prompt, uses the value from a prior {@link detectPrompt} call.
    * @param prompt - Substring to match on the last line (e.g. `"$"`, `">>>"`, `"%"`).
-   * @param timeout - Max wait time in ms. Default: 10 000.
+   * @param timeout - Max wait time in ms. Default: 5 000.
    */
   waitForPrompt(prompt?: string, timeout?: number): Pane;
   /**
    * Detect the prompt string of the current shell or REPL. Types a random marker,
    * captures the pane to find the text preceding it (the prompt), then erases the marker.
    * The detected prompt is stored and used by subsequent {@link waitForPrompt} calls with no argument.
-   * @param timeout - Max wait time in ms. Default: 10 000.
+   * @param timeout - Max wait time in ms. Default: 5 000.
    */
   detectPrompt(timeout?: number): Pane;
   /**
    * Block until the tmux pane title contains `title`.
-   * Polls every 100ms via `display-message #{pane_title}`.
+   * Uses tmux `refresh-client -B` subscriptions for push-based notification.
    * Useful for programs that set the terminal title (e.g. Claude Code).
    * @param title - Substring to match in the pane title.
-   * @param timeout - Max wait time in ms. Default: 10 000.
+   * @param timeout - Max wait time in ms. Default: 5 000.
    */
   waitForTitle(title: string, timeout?: number): Pane;
 }

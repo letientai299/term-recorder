@@ -93,7 +93,9 @@ export function quoteCcArg(arg: string): string {
   // Unbalanced braces can't use {braces} quoting
   const balanced =
     canBrace &&
-    arg.split("").reduce((d, c) => (c === "{" ? d + 1 : c === "}" ? d - 1 : d), 0) === 0;
+    arg
+      .split("")
+      .reduce((d, c) => (c === "{" ? d + 1 : c === "}" ? d - 1 : d), 0) === 0;
 
   if (canBrace && balanced) return `{${arg}}`;
 
@@ -108,10 +110,10 @@ export function quoteCcArg(arg: string): string {
  * so multiple recordings can run in parallel without interfering with each other
  * or the user's tmux sessions.
  *
- * After {@link connect}, commands are sent over tmux control mode (`-C`) — a
- * persistent stdin/stdout connection that avoids subprocess spawn per command.
- * Before `connect()` or after {@link disconnect}, commands fall back to
- * one-shot `tmux` subprocesses.
+ * After {@link connect}, a continuous dispatch loop reads the control mode
+ * stream and routes notifications (`%output`, `%subscription-changed`) to
+ * registered listeners. Commands are serialized via a mutex and their
+ * `%begin`/`%end` responses are delivered through promises.
  *
  * Most users don't interact with this class directly — {@link main} and
  * {@link executeRecording} manage server lifecycle automatically.
@@ -124,6 +126,18 @@ export class TmuxServer {
 
   /** Callbacks keyed by subscription name, invoked on %subscription-changed. */
   private subscriptions = new Map<string, Array<(value: string) => void>>();
+
+  /** Listeners invoked on any %output notification. */
+  private outputListeners = new Set<(paneId: string) => void>();
+
+  /** Pending command response — set before sending, resolved by dispatch loop. */
+  private pending?: {
+    resolve: (output: string) => void;
+    reject: (err: Error) => void;
+    args: string[];
+    output: string[];
+    inBlock: boolean;
+  };
 
   /**
    * @param socketName - Unique tmux socket name (passed as `tmux -L <name>`).
@@ -154,27 +168,103 @@ export class TmuxServer {
     });
     this.reader = new LineReader(this.proc.stdout);
     this.connected = true;
-    await this.consumeInitialBlock();
+
+    // Set up response handler for the initial block BEFORE starting dispatch
+    const initialBlock = this.awaitResponse([]);
+    void this.dispatch();
+    await initialBlock;
   }
 
-  /** Consume the initial %begin/%end block tmux sends on attach command. */
-  private async consumeInitialBlock(): Promise<void> {
-    let inBlock = false;
-    while (true) {
-      const line = await this.nextLine();
-      if (!inBlock && line.startsWith("%begin ")) {
-        inBlock = true;
-        continue;
+  /**
+   * Continuous dispatch loop — reads every line from the control mode stream
+   * and routes it to the appropriate handler.
+   */
+  private async dispatch(): Promise<void> {
+    try {
+      while (this.connected) {
+        const line = await this.nextLine();
+        this.routeLine(line);
       }
-      if (inBlock && (line.startsWith("%end ") || line.startsWith("%error "))) {
-        return;
+    } catch {
+      // Stream closed — normal during disconnect
+      this.rejectPending();
+    }
+  }
+
+  /** Route a single line from the control mode stream. */
+  private routeLine(line: string): void {
+    const p = this.pending;
+
+    // Inside a %begin block — collect output or resolve/reject
+    if (p?.inBlock) {
+      if (line.startsWith("%end ")) {
+        this.pending = undefined;
+        p.resolve(p.output.join("\n"));
+      } else if (line.startsWith("%error ")) {
+        this.pending = undefined;
+        p.reject(new TmuxError(p.args, 1, p.output.join("\n")));
+      } else {
+        p.output.push(line);
       }
+      return;
+    }
+
+    // Waiting for a block to start
+    if (p && line.startsWith("%begin ")) {
+      p.inBlock = true;
+      return;
+    }
+
+    // Notifications (arrive between blocks or before the first %begin)
+    if (line.startsWith("%output ")) {
+      this.handleOutput(line);
+    } else if (line.startsWith("%subscription-changed ")) {
+      this.handleSubscriptionChanged(line);
+    }
+    // Other notifications (%session-changed, %window-*, etc.) are ignored
+  }
+
+  /** Parse %output and notify listeners. */
+  private handleOutput(line: string): void {
+    // Format: %output %<pane-id> <octal-encoded-data>
+    const match = line.match(/^%output (%\d+) /);
+    if (!match) return;
+    const paneId = match[1] ?? "";
+    for (const fn of this.outputListeners) fn(paneId);
+  }
+
+  /** Parse %subscription-changed and invoke registered callbacks. */
+  private handleSubscriptionChanged(line: string): void {
+    // Format: %subscription-changed <name> <item> : <value>
+    const rest = line.slice("%subscription-changed ".length);
+    const spaceIdx = rest.indexOf(" ");
+    if (spaceIdx < 0) return;
+    const name = rest.slice(0, spaceIdx);
+    const colonIdx = rest.indexOf(" : ", spaceIdx);
+    const value = colonIdx >= 0 ? rest.slice(colonIdx + 3) : "";
+    const cbs = this.subscriptions.get(name);
+    if (cbs) for (const cb of [...cbs]) cb(value);
+  }
+
+  /** Reject any pending command response (called on stream close). */
+  private rejectPending(): void {
+    if (this.pending) {
+      const p = this.pending;
+      this.pending = undefined;
+      p.reject(new StreamClosedError());
     }
   }
 
   private async nextLine(): Promise<string> {
     if (!this.reader) throw new StreamClosedError();
     return this.reader.nextLine();
+  }
+
+  /** Create a promise that the dispatch loop will resolve when the response block completes. */
+  private awaitResponse(args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      this.pending = { resolve, reject, args, output: [], inBlock: false };
+    });
   }
 
   /** Send a command via control mode and await its response. Serialized via mutex. */
@@ -186,46 +276,11 @@ export class TmuxServer {
     });
     try {
       await prev;
-      return await this.controlCommandInner(...args);
+      const cmd = args.map((a) => quoteCcArg(a)).join(" ");
+      this.proc?.stdin.write(`${cmd}\n`);
+      return await this.awaitResponse(args);
     } finally {
       release();
-    }
-  }
-
-  private async controlCommandInner(...args: string[]): Promise<string> {
-    const cmd = args.map((a) => quoteCcArg(a)).join(" ");
-    this.proc?.stdin.write(`${cmd}\n`);
-
-    const output: string[] = [];
-    let inBlock = false;
-    while (true) {
-      const line = await this.nextLine();
-      if (!inBlock && line.startsWith("%subscription-changed ")) {
-        // Format: %subscription-changed <name> <item> : <value>
-        const rest = line.slice("%subscription-changed ".length);
-        const spaceIdx = rest.indexOf(" ");
-        if (spaceIdx >= 0) {
-          const name = rest.slice(0, spaceIdx);
-          const colonIdx = rest.indexOf(" : ", spaceIdx);
-          const value = colonIdx >= 0 ? rest.slice(colonIdx + 3) : "";
-          const cbs = this.subscriptions.get(name);
-          if (cbs) for (const cb of [...cbs]) cb(value);
-        }
-        continue;
-      }
-      if (!inBlock && line.startsWith("%begin ")) {
-        inBlock = true;
-        continue;
-      }
-      if (inBlock && line.startsWith("%end ")) {
-        return output.join("\n");
-      }
-      if (inBlock && line.startsWith("%error ")) {
-        throw new TmuxError(args, 1, output.join("\n"));
-      }
-      if (inBlock) {
-        output.push(line);
-      }
     }
   }
 
@@ -263,11 +318,7 @@ export class TmuxServer {
    * The server will push `%subscription-changed` notifications when the
    * format value changes.
    */
-  async subscribe(
-    name: string,
-    target: string,
-    format: string,
-  ): Promise<void> {
+  async subscribe(name: string, target: string, format: string): Promise<void> {
     if (!this.subscriptions.has(name)) this.subscriptions.set(name, []);
     await this.tmux("refresh-client", "-B", `${name}:${target}:${format}`);
   }
@@ -319,11 +370,25 @@ export class TmuxServer {
     });
   }
 
+  /**
+   * Register a listener for `%output` notifications.
+   * Callback receives the tmux pane ID (e.g. `"%0"`).
+   */
+  onOutput(callback: (paneId: string) => void): void {
+    this.outputListeners.add(callback);
+  }
+
+  /** Remove an `%output` listener. */
+  offOutput(callback: (paneId: string) => void): void {
+    this.outputListeners.delete(callback);
+  }
+
   /** Detach from control mode. */
   async disconnect(): Promise<void> {
     if (!this.connected || !this.proc) return;
     this.connected = false;
     this.reader = undefined;
+    this.rejectPending();
     const proc = this.proc;
     this.proc = undefined;
 

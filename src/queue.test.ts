@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  ActionQueue,
-  createPaneProxy,
-  createSessionProxy,
-} from "./queue.ts";
+import { ActionQueue, createPaneProxy, createSessionProxy } from "./queue.ts";
 import { TmuxServer } from "./shell.ts";
 
 const server = new TmuxServer("test-queue-dummy");
@@ -19,13 +15,13 @@ describe("ActionQueue", () => {
 });
 
 describe("createPaneProxy", () => {
-  test("queues type action", () => {
+  test("queues send action", () => {
     const queue = new ActionQueue(server, cfg);
     const pane = createPaneProxy(queue, "test:0.0");
-    pane.type("hello");
+    pane.send("hello");
     expect(queue.actions).toHaveLength(1);
     expect(queue.actions[0]).toEqual({
-      kind: "type",
+      kind: "send",
       pane: "test:0.0",
       text: "hello",
     });
@@ -34,9 +30,9 @@ describe("createPaneProxy", () => {
   test("supports chaining", () => {
     const queue = new ActionQueue(server, cfg);
     const pane = createPaneProxy(queue, "test:0.0");
-    pane.type("hello").enter().key("Up");
+    pane.send("hello").enter().key("Up");
     expect(queue.actions).toHaveLength(3);
-    expect(queue.actions[0]?.kind).toBe("type");
+    expect(queue.actions[0]?.kind).toBe("send");
     expect(queue.actions[1]?.kind).toBe("enter");
     expect(queue.actions[2]?.kind).toBe("key");
   });
@@ -58,10 +54,10 @@ describe("createSessionProxy", () => {
   test("has pane methods on default pane", () => {
     const queue = new ActionQueue(server, cfg);
     const session = createSessionProxy(queue, "test-session");
-    session.type("hello").enter();
+    session.send("hello").enter();
     expect(queue.actions).toHaveLength(2);
     expect(queue.actions[0]).toEqual({
-      kind: "type",
+      kind: "send",
       pane: "test-session:0.0",
       text: "hello",
     });
@@ -78,7 +74,7 @@ describe("createSessionProxy", () => {
     const queue = new ActionQueue(server, cfg);
     const session = createSessionProxy(queue, "test-session");
     const pane2 = session.splitH(50);
-    pane2.type("in pane 2");
+    pane2.send("in pane 2");
     expect(queue.actions).toHaveLength(2);
     const split = queue.actions[0] as Extract<
       (typeof queue.actions)[0],

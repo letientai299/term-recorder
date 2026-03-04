@@ -13,13 +13,40 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "complexity": {
+        "noForEach": "error",
+        "noUselessStringConcat": "error",
+        "noUselessUndefinedInitialization": "error",
+        "useArrowFunction": "error",
+        "useDateNow": "error",
+        "useFlatMap": "error"
+      },
       "correctness": {
         "noUnusedVariables": "error",
-        "noUnusedImports": "error"
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUndeclaredDependencies": "error",
+        "noGlobalDirnameFilename": "error"
+      },
+      "performance": {
+        "noReExportAll": "error"
       },
       "style": {
-        "noNonNullAssertion": "error"
+        "noNonNullAssertion": "error",
+        "noDefaultExport": "error",
+        "noParameterAssign": "error",
+        "useForOf": "error",
+        "useThrowOnlyError": "error",
+        "noNamespace": "error",
+        "useExplicitLengthCheck": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "nursery": {
+        "noFloatingPromises": "error"
       }
     }
-  }
+  },
+  "overrides": []
 }

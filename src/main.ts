@@ -71,6 +71,39 @@ function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
 
 const DEFAULT_OUTPUT_DIR = "./casts";
 
+const CLI_OPTIONS: Array<[flags: string, arg: string, desc: string]> = [
+  ["-h, --help", "", "Show this help message"],
+  ["--headless", "", "Run headless with auto-parallel (cpus/2)"],
+  ["-p, --parallel", "N", "Max parallel recordings"],
+  ["-o, --output-dir", "DIR", "Output directory (default: ./casts)"],
+  ["-f, --filter", "REGEX", "Filter recordings by name"],
+  ["--load-tmux-conf", "", "Load user's tmux.conf"],
+  ["--load-asciinema-conf", "", "Load user's asciinema config"],
+  ["--dry-run", "", "Print recording names and exit"],
+];
+
+function formatHelp(recordings: Recording[], outputDir: string): string {
+  const outputs = recordings
+    .map((r) => `  ${join(outputDir, `${r.name}.cast`)}`)
+    .join("\n");
+
+  const PAD = 28;
+  const options = CLI_OPTIONS.map(([flags, arg, desc]) => {
+    const left = arg.length > 0 ? `${flags} ${arg}` : flags;
+    return `  ${left.padEnd(PAD)}${desc}`;
+  }).join("\n");
+
+  return [
+    "Record terminal demos to asciicast files.",
+    "",
+    "Usage: bun <script> [options]",
+    "",
+    outputs,
+    "",
+    options,
+  ].join("\n");
+}
+
 interface RecordingResult {
   name: string;
   durationMs: number;
@@ -130,48 +163,7 @@ async function runWithConcurrency(
   return results;
 }
 
-/**
- * Run one or more recordings, writing `.cast` files to disk.
- *
- * This is the main entry point for a recording script. It parses `process.argv`
- * for CLI flags (see `--help`), merges them with the provided {@link Config},
- * validates recording names, and executes with appropriate concurrency.
- *
- * Headful mode runs recordings sequentially (one visible tmux window at a time).
- * Headless mode auto-parallelizes to `cpus / 2` unless overridden with `-p`.
- *
- * @param config - Shared config for all recordings.
- * @param recordings - Array of {@link Recording} descriptors created by {@link record}.
- */
-export async function main(
-  config: Config,
-  recordings: Recording[],
-): Promise<void> {
-  const cli = parseCliFlags(process.argv.slice(2));
-
-  if (cli.help) {
-    const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
-    console.log(`Record terminal demos to asciicast files.
-
-Usage: bun <script> [options]
-
-${recordings.map((r) => `  ${join(outputDir, `${r.name}.cast`)}`).join("\n")}
-
-  -h, --help                Show this help message
-  --headless                Run headless with auto-parallel (cpus/2)
-  -p, --parallel N          Max parallel recordings
-  -o, --output-dir DIR      Output directory (default: ./casts)
-  -f, --filter REGEX        Filter recordings by name
-  --load-tmux-conf          Load user's tmux.conf
-  --load-asciinema-conf     Load user's asciinema config
-  --dry-run                 Print recording names and exit`);
-    return;
-  }
-
-  const opts = resolveOptions(config, cli);
-  const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
-
-  // Validate: no duplicate names
+function validateUniqueNames(recordings: Recording[]): void {
   const names = new Set<string>();
   for (const rec of recordings) {
     if (names.has(rec.name)) {
@@ -180,48 +172,31 @@ ${recordings.map((r) => `  ${join(outputDir, `${r.name}.cast`)}`).join("\n")}
     }
     names.add(rec.name);
   }
+}
 
-  // Filter by regex
-  let filtered = recordings;
-  if (cli.filter) {
-    let re: RegExp;
-    try {
-      re = new RegExp(cli.filter);
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      console.error(`Error: invalid --filter regex "${cli.filter}": ${reason}`);
-      process.exit(1);
-    }
-    filtered = recordings.filter((r) => re.test(r.name));
-    if (filtered.length === 0) {
-      console.error(
-        `No recordings match filter "${cli.filter}". Available: ${recordings.map((r) => r.name).join(", ")}`,
-      );
-      process.exit(1);
-    }
+function filterRecordings(
+  recordings: Recording[],
+  pattern: string,
+): Recording[] {
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`Error: invalid --filter regex "${pattern}": ${reason}`);
+    process.exit(1);
   }
-
-  // Dry run: print names and exit
-  if (cli.dryRun) {
-    for (const rec of filtered) {
-      console.log(rec.name);
-    }
-    return;
+  const filtered = recordings.filter((r) => re.test(r.name));
+  if (filtered.length === 0) {
+    console.error(
+      `No recordings match filter "${pattern}". Available: ${recordings.map((r) => r.name).join(", ")}`,
+    );
+    process.exit(1);
   }
+  return filtered;
+}
 
-  // Determine concurrency: explicit flag > auto (cpus/2 for headless, 1 for headful)
-  const concurrency =
-    cli.parallel ??
-    (opts.mode === "headless" ? Math.max(1, Math.floor(cpus().length / 2)) : 1);
-
-  console.log(
-    `Recording ${filtered.length} cast${filtered.length > 1 ? "s" : ""} → ${outputDir} (${opts.mode}, concurrency: ${concurrency})`,
-  );
-
-  const tasks = filtered.map((rec) => () => runOne(rec, opts, outputDir));
-  const results = await runWithConcurrency(tasks, concurrency);
-
-  // Report
+function reportResults(results: RecordingResult[]): void {
   let failed = 0;
   for (const r of results) {
     const duration = (r.durationMs / 1000).toFixed(1);
@@ -232,9 +207,57 @@ ${recordings.map((r) => `  ${join(outputDir, `${r.name}.cast`)}`).join("\n")}
       console.log(`  ✓ ${r.name} (${duration}s)`);
     }
   }
-
   if (failed > 0) {
     console.error(`\n${failed} recording(s) failed`);
     process.exit(1);
   }
+}
+
+/**
+ * Run one or more recordings, writing `.cast` files to disk.
+ *
+ * Parses `process.argv` for CLI flags (see `--help`), merges them with
+ * the provided {@link Config}, validates recording names, and executes
+ * with appropriate concurrency.
+ *
+ * Headful mode runs sequentially. Headless auto-parallelizes to `cpus / 2`
+ * unless overridden with `-p`.
+ */
+export async function main(
+  config: Config,
+  recordings: Recording[],
+): Promise<void> {
+  const cli = parseCliFlags(process.argv.slice(2));
+  const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
+
+  if (cli.help) {
+    console.log(formatHelp(recordings, outputDir));
+    return;
+  }
+
+  validateUniqueNames(recordings);
+
+  const filtered = cli.filter
+    ? filterRecordings(recordings, cli.filter)
+    : recordings;
+
+  if (cli.dryRun) {
+    for (const rec of filtered) {
+      console.log(rec.name);
+    }
+    return;
+  }
+
+  const opts = resolveOptions(config, cli);
+  const concurrency =
+    cli.parallel ??
+    (opts.mode === "headless" ? Math.max(1, Math.floor(cpus().length / 2)) : 1);
+
+  console.log(
+    `Recording ${filtered.length} cast${filtered.length > 1 ? "s" : ""} → ${outputDir} (${opts.mode}, concurrency: ${concurrency})`,
+  );
+
+  const tasks = filtered.map((rec) => () => runOne(rec, opts, outputDir));
+  const results = await runWithConcurrency(tasks, concurrency);
+  reportResults(results);
 }

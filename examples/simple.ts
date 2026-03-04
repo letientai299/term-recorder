@@ -3,47 +3,47 @@ import { ctrl, defineConfig, main, record } from "../src";
 const config = defineConfig({});
 
 const hello = record("hello", (s) => {
-  s.typeHuman("echo 'Hello from term-recorder!'").enter();
-  s.typeHuman("ls -la").enter();
-  s.typeHuman("echo 'Demo complete.'").enter();
+  s.type("echo 'Hello from term-recorder!'").enter();
+  s.type("ls -la").enter();
+  s.type("echo 'Demo complete.'").enter();
 });
 
 const split = record("split", (s) => {
-  s.typeHuman("echo 'Left pane'").enter();
+  s.type("echo 'Left pane'").enter();
   const right = s.splitH(50);
-  right.typeHuman("echo 'Right pane'").enter();
-  s.typeHuman("echo 'Both panes visible!'").enter();
-  right.typeHuman("ls").enter();
+  right.type("echo 'Right pane'").enter();
+  s.type("echo 'Both panes visible!'").enter();
+  right.type("ls").enter();
 });
 
 const exec = record("exec-wait", (s) => {
-  s.typeHuman("echo 'Running a slow command...'").enter();
+  s.type("echo 'Running a slow command...'").enter();
   s.exec("sleep 2 && echo 'DONE: slow command finished'");
-  s.typeHuman("echo 'Now using waitForText...'").enter();
-  s.typeHuman("(sleep 1 && echo MARKER_READY) &").enter();
+  s.type("echo 'Now using waitForText...'").enter();
+  s.type("(sleep 1 && echo MARKER_READY) &").enter();
   s.waitForText("MARKER_READY", 5000);
-  s.typeHuman("echo 'Detected MARKER_READY — continuing.'").enter();
+  s.type("echo 'Detected MARKER_READY — continuing.'").enter();
 });
 
 const keys = record("keys-ctrl", (s) => {
-  s.typeHuman("echo 'first command'").enter();
-  s.typeHuman("echo 'second command'").enter();
+  s.type("echo 'first command'").enter();
+  s.type("echo 'second command'").enter();
   s.key("Up").key("Up").key("Down").enter();
-  s.typeHuman("this-will-be-cancelled");
-  s.type(ctrl("c"));
-  s.typeHuman("echo 'Ctrl+C worked, back to clean prompt'").enter();
+  s.type("this-will-be-cancelled");
+  s.send(ctrl("c"));
+  s.type("echo 'Ctrl+C worked, back to clean prompt'").enter();
 });
 
 const topBottom = record("top-bottom", (s) => {
-  s.typeHuman(
+  s.type(
     "cat > hello.sh << 'EOF'\n#!/bin/bash\necho \"Hello from term-recorder!\"\nEOF",
   ).enter();
-  s.typeHuman("chmod +x hello.sh").enter();
+  s.type("chmod +x hello.sh").enter();
   const bottom = s.splitV(40);
-  bottom.typeHuman("./hello.sh").enter();
-  s.typeHuman("cat hello.sh").enter();
-  bottom.typeHuman("rm hello.sh").enter();
-  s.typeHuman("echo 'Demo complete.'").enter();
+  bottom.type("./hello.sh").enter();
+  s.type("cat hello.sh").enter();
+  bottom.type("rm hello.sh").enter();
+  s.type("echo 'Demo complete.'").enter();
 });
 
 await main(config, [hello, split, exec, keys, topBottom]);

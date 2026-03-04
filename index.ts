@@ -1,2 +1,2 @@
-export type { PaneApi, RecordOptions, SessionApi } from "./src/index.ts";
-export { ctrl, record } from "./src/index.ts";
+export type { Config, Pane, Recording, Session } from "./src/index.ts";
+export { ctrl, defineConfig, main, record } from "./src/index.ts";

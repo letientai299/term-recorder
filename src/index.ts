@@ -1,10 +1,7 @@
 export type { Config } from "./config.ts";
 export { defineConfig } from "./config.ts";
-export { executeRecording } from "./execute.ts";
 export { ctrl } from "./keys.ts";
 export { main } from "./main.ts";
 export type { Recording } from "./recording.ts";
 export { record } from "./recording.ts";
-export { TmuxServer } from "./shell.ts";
-export type { PaneApi, RecordOptions, SessionApi } from "./types.ts";
-export { DEFAULT_ACTION_DELAY_MS, DEFAULT_TYPING_DELAY_MS } from "./types.ts";
+export type { Pane, Session } from "./types.ts";

@@ -31,8 +31,8 @@ const config = defineConfig({
 
 await main(config, [
   record("hello", (s) => {
-    s.typeHuman("echo 'Hello from term-recorder!'").enter();
-    s.typeHuman("ls -la").enter();
+    s.type("echo 'Hello from term-recorder!'").enter();
+    s.type("ls -la").enter();
   }),
 ]);
 ```

@@ -8,7 +8,7 @@ import {
   DEFAULT_ACTION_DELAY_MS,
   DEFAULT_TYPING_DELAY_MS,
   type RecordOptions,
-  type SessionApi,
+  type Session,
 } from "./types.ts";
 
 /**
@@ -23,14 +23,14 @@ import {
  *
  * @param castFile - Path to the output `.cast` file. Parent directories are created automatically.
  * @param opts - Recording options (terminal size, delays, mode, etc.).
- * @param script - Script callback that queues actions on a {@link SessionApi}.
+ * @param script - Script callback that queues actions on a {@link Session}.
  * @param server - Optional pre-existing {@link TmuxServer}. If omitted, a temporary server
  *   is created and destroyed after the recording finishes.
  */
 export async function executeRecording(
   castFile: string,
   opts: RecordOptions,
-  script: (s: SessionApi) => void | Promise<void>,
+  script: (s: Session) => void | Promise<void>,
   server?: TmuxServer,
 ): Promise<void> {
   const name = opts.sessionName ?? `rec-${Date.now()}`;

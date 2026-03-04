@@ -1,4 +1,4 @@
-/** Map of named keys to their terminal escape sequences. Used by {@link PaneApi.key}. */
+/** Map of named keys to their terminal escape sequences. Used by {@link Pane.key}. */
 export const KEYS: Record<string, string> = {
   Escape: "\x1b",
   Enter: "\r",
@@ -31,7 +31,7 @@ export const KEYS: Record<string, string> = {
 
 /**
  * Produce a Ctrl+key escape sequence from a single character.
- * Pass the result to {@link PaneApi.type} (not `typeHuman` — control sequences
+ * Pass the result to {@link Pane.type} (not `type` — control sequences
  * should be sent instantly).
  *
  * @example

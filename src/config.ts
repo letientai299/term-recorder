@@ -11,7 +11,7 @@ export interface Config {
   mode?: "headful" | "headless";
   /** Shell to launch inside tmux panes. Default: inherited from `$SHELL`. */
   shell?: string;
-  /** Per-character delay for {@link PaneApi.typeHuman} in ms. Default: 100 (~120 WPM). */
+  /** Per-character delay for {@link Pane.type} in ms. Default: 100 (~120 WPM). */
   typingDelay?: number;
   /** Automatic pause inserted between every action in ms. Default: 300. Set to 0 to disable. */
   actionDelay?: number;

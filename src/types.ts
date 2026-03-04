@@ -14,7 +14,7 @@ export interface RecordOptions {
   mode?: "headful" | "headless";
   /** Shell to launch inside tmux panes. Default: inherited from `$SHELL`. */
   shell?: string;
-  /** Per-char delay for {@link PaneApi.typeHuman} in ms. Default: 100 (~120 WPM). */
+  /** Per-char delay for {@link Pane.type} in ms. Default: 100 (~120 WPM). */
   typingDelay?: number;
   /** Auto-pause between actions in ms. Negative values become 0. Default: 300. */
   actionDelay?: number;
@@ -33,8 +33,8 @@ export interface RecordOptions {
 }
 
 export type Action =
-  | { kind: "type"; pane: string; text: string }
-  | { kind: "typeHuman"; pane: string; text: string; delayMs?: number }
+  | { kind: "send"; pane: string; text: string }
+  | { kind: "type"; pane: string; text: string; delayMs?: number }
   | { kind: "key"; pane: string; name: string }
   | { kind: "enter"; pane: string }
   | { kind: "exec"; pane: string; cmd: string; timeout?: number }
@@ -49,23 +49,23 @@ export type Action =
  * and queue actions for later execution — nothing runs until {@link main}
  * drains the queue.
  */
-export interface PaneApi {
+export interface Pane {
   /** Send literal text instantly (no per-character delay). Useful for control sequences like `ctrl("c")`. */
-  type(text: string): PaneApi;
+  send(text: string): Pane;
   /**
    * Type text with a per-character delay to simulate human typing.
    * @param text - Text to type.
    * @param delayMs - Override the per-char delay (ms). Default: {@link Config.typingDelay} or 100.
    */
-  typeHuman(text: string, delayMs?: number): PaneApi;
+  type(text: string, delayMs?: number): Pane;
   /**
    * Send a named key. Available names: `Escape`, `Enter`, `Tab`, `Backspace`, `Space`,
    * `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `Insert`, `Delete`,
    * `PageUp`, `PageDown`, `F1`–`F12`.
    */
-  key(name: string): PaneApi;
+  key(name: string): Pane;
   /** Press Enter. Shorthand for `.key("Enter")`. */
-  enter(): PaneApi;
+  enter(): Pane;
   /**
    * Run a shell command and block until the prompt returns.
    * Internally wraps the command in a subshell with an EXIT trap that signals
@@ -73,41 +73,41 @@ export interface PaneApi {
    * @param cmd - Shell command to execute.
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
-  exec(cmd: string, timeout?: number): PaneApi;
+  exec(cmd: string, timeout?: number): Pane;
   /** Pause for a fixed duration. Does not add an extra {@link Config.actionDelay} after itself. */
-  sleep(ms: number): PaneApi;
+  sleep(ms: number): Pane;
   /**
    * Block until `text` appears anywhere in the pane content.
    * Polls every 200ms via `capture-pane`.
    * @param text - Substring to search for.
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
-  waitForText(text: string, timeout?: number): PaneApi;
+  waitForText(text: string, timeout?: number): Pane;
   /**
    * Block until the last non-empty line in the pane contains `prompt`.
    * Useful for waiting until a shell or REPL is ready for input.
    * @param prompt - Substring to match on the last line (e.g. `"$"`, `">>>"`, `"%"`).
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
-  waitForPrompt(prompt: string, timeout?: number): PaneApi;
+  waitForPrompt(prompt: string, timeout?: number): Pane;
 }
 
 /**
- * The main pane of a tmux session. Extends {@link PaneApi} with methods to
+ * The main pane of a tmux session. Extends {@link Pane} with methods to
  * create additional panes via splits. Passed to the {@link record} callback.
  */
-export interface SessionApi extends PaneApi {
-  sleep(ms: number): SessionApi;
+export interface Session extends Pane {
+  sleep(ms: number): Session;
   /**
-   * Split the session horizontally (side by side). Returns a {@link PaneApi}
+   * Split the session horizontally (side by side). Returns a {@link Pane}
    * targeting the new right pane.
    * @param percent - Width of the new pane as a percentage. Omit for tmux default (50%).
    */
-  splitH(percent?: number): PaneApi;
+  splitH(percent?: number): Pane;
   /**
-   * Split the session vertically (top/bottom). Returns a {@link PaneApi}
+   * Split the session vertically (top/bottom). Returns a {@link Pane}
    * targeting the new bottom pane.
    * @param percent - Height of the new pane as a percentage. Omit for tmux default (50%).
    */
-  splitV(percent?: number): PaneApi;
+  splitV(percent?: number): Pane;
 }

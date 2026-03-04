@@ -27,6 +27,7 @@ export async function executeRecording(
   const dir = dirname(castFile);
   if (dir !== ".") mkdirSync(dir, { recursive: true });
 
+  const ownsServer = !server;
   const srv =
     server ?? new TmuxServer(`tr-${name}`, opts.userTmuxConf ?? false);
   let recording: Awaited<ReturnType<typeof startRecording>> | undefined;
@@ -56,5 +57,6 @@ export async function executeRecording(
     // Disconnect control mode before killing sessions
     await srv.disconnect();
     await stopRecording(srv, name, recording);
+    if (ownsServer) await srv.destroy();
   }
 }

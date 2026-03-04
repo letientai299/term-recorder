@@ -5,6 +5,7 @@ import { capturePane, sendKeys } from "./pane.ts";
 import { createSession, killSession } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import type { RecordOptions } from "./types.ts";
+import { pollPane } from "./wait.ts";
 
 function captureSessionName(mainSession: string): string {
   return `${mainSession}-capture`;
@@ -39,17 +40,14 @@ async function waitForPaneContent(
   timeoutMs: number,
   label: string,
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const content = await capturePane(server, target);
-      if (content.trim().length > 0) return;
-    } catch {
-      // Session/pane may not exist yet
-    }
-    await Bun.sleep(100);
-  }
-  throw new Error(`${label}: pane ${target} had no content after ${timeoutMs}ms`);
+  return pollPane(
+    server,
+    target,
+    (c) => c.trim().length > 0,
+    timeoutMs,
+    label,
+    { suppressErrors: true },
+  );
 }
 
 /**
@@ -163,17 +161,22 @@ export async function stopRecording(
   if (handle?.headfulProc) {
     await handle.headfulProc.exited;
   } else {
-    // 14e: Poll cast file for write completion instead of fixed 1000ms sleep
+    // Poll cast file for write completion — require 3 consecutive stable reads
     if (handle?.castFile) {
       const deadline = Date.now() + 10_000;
       let lastSize = -1;
+      let stableCount = 0;
       while (Date.now() < deadline) {
         try {
           const { size } = statSync(handle.castFile);
-          if (size > 0 && size === lastSize) break;
+          if (size > 0 && size === lastSize) {
+            if (++stableCount >= 3) break;
+          } else {
+            stableCount = 0;
+          }
           lastSize = size;
         } catch {
-          // File may not exist yet
+          stableCount = 0;
         }
         await Bun.sleep(100);
       }

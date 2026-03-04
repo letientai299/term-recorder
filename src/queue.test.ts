@@ -74,21 +74,26 @@ describe("createSessionProxy", () => {
     expect(queue.actions[0]).toEqual({ kind: "sleep", ms: 1000 });
   });
 
-  test("splitH returns a pane proxy for new pane", () => {
+  test("splitH returns a pane proxy with placeholder target", () => {
     const queue = new ActionQueue(server, cfg);
     const session = createSessionProxy(queue, "test-session");
     const pane2 = session.splitH(50);
     pane2.type("in pane 2");
     expect(queue.actions).toHaveLength(2);
-    expect(queue.actions[0]).toEqual({
-      kind: "splitH",
-      session: "test-session",
-      percent: 50,
-    });
-    expect(queue.actions[1]).toEqual({
-      kind: "type",
-      pane: "test-session:0.1",
-      text: "in pane 2",
-    });
+    const split = queue.actions[0] as Extract<
+      (typeof queue.actions)[0],
+      { kind: "splitH" }
+    >;
+    expect(split.kind).toBe("splitH");
+    expect(split.session).toBe("test-session");
+    expect(split.percent).toBe(50);
+    expect(split.placeholder).toBeString();
+    // The type action targets the same placeholder — resolved at drain time
+    const typeAction = queue.actions[1] as Extract<
+      (typeof queue.actions)[0],
+      { kind: "type" }
+    >;
+    expect(typeAction.pane).toBe(split.placeholder);
+    expect(typeAction.text).toBe("in pane 2");
   });
 });

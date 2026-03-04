@@ -32,6 +32,7 @@ export class TmuxServer {
   private lineReject?: (err: Error) => void;
   private connected = false;
   private streamDone = false;
+  private commandLock = Promise.resolve();
 
   constructor(
     readonly socketName: string,
@@ -134,8 +135,17 @@ export class TmuxServer {
     return arg;
   }
 
-  /** Send a command via control mode and await its response. */
-  private async controlCommand(...args: string[]): Promise<string> {
+  /** Send a command via control mode and await its response. Serialized via mutex. */
+  private controlCommand(...args: string[]): Promise<string> {
+    let release: () => void;
+    const prev = this.commandLock;
+    this.commandLock = new Promise((r) => {
+      release = r;
+    });
+    return prev.then(() => this.controlCommandInner(...args)).finally(() => release!());
+  }
+
+  private async controlCommandInner(...args: string[]): Promise<string> {
     const cmd = args.map((a) => this.quoteCcArg(a)).join(" ");
     this.proc?.stdin.write(`${cmd}\n`);
 

@@ -35,8 +35,8 @@ export type Action =
   | { kind: "sleep"; ms: number }
   | { kind: "waitForText"; pane: string; text: string; timeout?: number }
   | { kind: "waitForPrompt"; pane: string; prompt: string; timeout?: number }
-  | { kind: "splitH"; session: string; percent?: number }
-  | { kind: "splitV"; session: string; percent?: number };
+  | { kind: "splitH"; session: string; percent?: number; placeholder?: string }
+  | { kind: "splitV"; session: string; percent?: number; placeholder?: string };
 
 export interface PaneApi {
   type(text: string): PaneApi;

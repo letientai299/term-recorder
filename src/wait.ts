@@ -5,6 +5,31 @@ const DEFAULT_TIMEOUT = 10_000;
 const POLL_INTERVAL = 200;
 
 /**
+ * Generic pane poller — captures pane content until `predicate` returns true.
+ * Set `suppressErrors` to swallow capture failures (e.g. pane not yet created).
+ */
+export async function pollPane(
+  server: TmuxServer,
+  target: string,
+  predicate: (content: string) => boolean,
+  timeout: number,
+  label: string,
+  opts?: { suppressErrors?: boolean },
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      const content = await capturePane(server, target);
+      if (predicate(content)) return;
+    } catch (err) {
+      if (!opts?.suppressErrors) throw err;
+    }
+    await Bun.sleep(POLL_INTERVAL);
+  }
+  throw new Error(`${label} timed out after ${timeout}ms on ${target}`);
+}
+
+/**
  * Poll capture-pane until `text` appears in the pane content.
  */
 export async function waitForText(
@@ -13,14 +38,12 @@ export async function waitForText(
   text: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<void> {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const content = await capturePane(server, target);
-    if (content.includes(text)) return;
-    await Bun.sleep(POLL_INTERVAL);
-  }
-  throw new Error(
-    `waitForText("${text}") timed out after ${timeout}ms on ${target}`,
+  return pollPane(
+    server,
+    target,
+    (c) => c.includes(text),
+    timeout,
+    `waitForText("${text}")`,
   );
 }
 
@@ -33,16 +56,15 @@ export async function waitForPrompt(
   prompt: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<void> {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const content = await capturePane(server, target);
-    const lines = content.split("\n").filter((l) => l.trim().length > 0);
-    const last = lines.at(-1) ?? "";
-    if (last.includes(prompt)) return;
-    await Bun.sleep(POLL_INTERVAL);
-  }
-  throw new Error(
-    `waitForPrompt("${prompt}") timed out after ${timeout}ms on ${target}`,
+  return pollPane(
+    server,
+    target,
+    (content) => {
+      const lines = content.split("\n").filter((l) => l.trim().length > 0);
+      return (lines.at(-1) ?? "").includes(prompt);
+    },
+    timeout,
+    `waitForPrompt("${prompt}")`,
   );
 }
 
@@ -50,7 +72,7 @@ let channelCounter = 0;
 
 /**
  * Execute a shell command and wait for it to finish using tmux wait-for.
- * Wraps the command in a brace group to avoid subshell paren-matching issues.
+ * Uses a subshell with EXIT trap so command content (}; etc.) can't break the signal.
  */
 export async function exec(
   server: TmuxServer,
@@ -63,7 +85,7 @@ export async function exec(
     "send-keys",
     "-t",
     target,
-    `{ ${cmd}; }; tmux wait-for -S ${channel}`,
+    `(trap 'tmux wait-for -S ${channel}' EXIT; ${cmd})`,
     "Enter",
   );
 

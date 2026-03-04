@@ -6,6 +6,7 @@ import { createSession } from "./session.ts";
 import { TmuxServer } from "./shell.ts";
 import {
   DEFAULT_ACTION_DELAY_MS,
+  DEFAULT_TRAILING_DELAY_MS,
   DEFAULT_TYPING_DELAY_MS,
   type RecordOptions,
   type Session,
@@ -61,8 +62,10 @@ export async function executeRecording(
     }
     await queue.drain();
 
-    // Brief pause so asciinema captures the final frame (~25ms capture interval)
-    await Bun.sleep(50);
+    // Keep the session alive so asciinema records idle time for the last frame.
+    // The 50ms base covers asciinema's ~25ms capture interval.
+    const trailing = Math.max(0, opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS);
+    await Bun.sleep(50 + trailing);
   } finally {
     // Disconnect control mode before killing sessions
     await srv.disconnect();

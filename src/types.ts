@@ -4,6 +4,9 @@ export const DEFAULT_TYPING_DELAY_MS = 75;
 /** Auto-pause between actions (ms). 0 = no pause. */
 export const DEFAULT_ACTION_DELAY_MS = 200;
 
+/** Idle time before ending recording so the last frame stays visible. */
+export const DEFAULT_TRAILING_DELAY_MS = 1000;
+
 /**
  * Low-level options for {@link executeRecording}.
  * Most users should use {@link Config} with {@link main} instead — `main()` resolves
@@ -30,6 +33,8 @@ export interface RecordOptions {
   cwd?: string;
   /** Override the tmux session name. Default: auto-generated from timestamp. */
   sessionName?: string;
+  /** Extra idle time (ms) before ending the recording, so the last frame stays visible on playback. Default: 1000. Set to 0 to disable. */
+  trailingDelay?: number;
 }
 
 /** Single source of truth for every action kind and its payload (excluding `kind` itself). */

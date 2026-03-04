@@ -11,10 +11,14 @@ afterEach(() => {
 
 describe("record (e2e)", () => {
   test("produces a valid cast file", async () => {
-    await executeRecording(CAST_FILE, { mode: "headless" }, (s) => {
+    await executeRecording(
+      CAST_FILE,
+      { mode: "headless", trailingDelay: 0 },
+      (s) => {
       s.type("echo hello-from-record").enter();
       s.sleep(1);
-    });
+    },
+    );
 
     expect(existsSync(CAST_FILE)).toBe(true);
     const header = castHeader(CAST_FILE);

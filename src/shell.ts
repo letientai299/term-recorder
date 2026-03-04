@@ -18,6 +18,68 @@ class StreamClosedError extends Error {
   }
 }
 
+/** Line-buffered reader over a ReadableStream. */
+class LineReader {
+  private buffer = "";
+  private lines: string[] = [];
+  private resolve?: () => void;
+  private reject?: (err: Error) => void;
+  private done = false;
+
+  constructor(stream: ReadableStream<Uint8Array>) {
+    this.pump(stream);
+  }
+
+  private pump(stream: ReadableStream<Uint8Array>): void {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    const run = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          this.buffer += decoder.decode(value, { stream: true });
+          const parts = this.buffer.split("\n");
+          this.buffer = parts.pop() ?? "";
+          for (const line of parts) {
+            this.lines.push(line);
+            this.resolve?.();
+          }
+        }
+      } catch {
+        // Stream closed or errored
+      }
+      this.done = true;
+      this.reject?.(new StreamClosedError());
+    };
+    void run();
+  }
+
+  async nextLine(): Promise<string> {
+    if (this.lines.length > 0) return this.lines.shift() ?? "";
+    if (this.done) throw new StreamClosedError();
+    await new Promise<void>((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
+    if (this.lines.length === 0) throw new StreamClosedError();
+    return this.lines.shift() ?? "";
+  }
+}
+
+/**
+ * Quote an argument for tmux control mode command parsing.
+ * Args containing spaces, special chars, or tmux format sequences
+ * must be wrapped in single quotes with internal quotes escaped.
+ */
+function quoteCcArg(arg: string): string {
+  if (arg.length === 0) return "''";
+  if (/[\s"'\\#{}$;~]/.test(arg) || arg.startsWith("-")) {
+    return `'${arg.replace(/'/g, "'\\''")}'`;
+  }
+  return arg;
+}
+
 /**
  * An isolated tmux server instance backed by a unique socket name.
  *
@@ -35,12 +97,8 @@ class StreamClosedError extends Error {
  */
 export class TmuxServer {
   private proc?: import("bun").Subprocess<"pipe", "pipe", "pipe">;
-  private lineBuffer = "";
-  private lines: string[] = [];
-  private lineResolve?: () => void;
-  private lineReject?: (err: Error) => void;
+  private reader?: LineReader;
   private connected = false;
-  private streamDone = false;
   private commandLock = Promise.resolve();
 
   /**
@@ -70,52 +128,9 @@ export class TmuxServer {
       stdout: "pipe",
       stderr: "pipe",
     });
-    this.streamDone = false;
-    this.startReading();
+    this.reader = new LineReader(this.proc.stdout);
     this.connected = true;
-    // Consume the initial %begin/%end block tmux sends on connect
     await this.consumeInitialBlock();
-  }
-
-  private startReading(): void {
-    const reader = this.proc?.stdout.getReader();
-    if (!reader) return;
-    const decoder = new TextDecoder();
-    const pump = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          this.lineBuffer += decoder.decode(value, { stream: true });
-          const parts = this.lineBuffer.split("\n");
-          // Last element is incomplete — keep it in buffer
-          this.lineBuffer = parts.pop() ?? "";
-          for (const line of parts) {
-            this.lines.push(line);
-            this.lineResolve?.();
-          }
-        }
-      } catch {
-        // Stream closed or errored
-      }
-      // Signal any pending nextLine() that the stream is done
-      this.streamDone = true;
-      this.lineReject?.(new StreamClosedError());
-    };
-    void pump();
-  }
-
-  private async nextLine(): Promise<string> {
-    if (this.lines.length > 0) {
-      return this.lines.shift() ?? "";
-    }
-    if (this.streamDone) throw new StreamClosedError();
-    await new Promise<void>((resolve, reject) => {
-      this.lineResolve = resolve;
-      this.lineReject = reject;
-    });
-    if (this.lines.length === 0) throw new StreamClosedError();
-    return this.lines.shift() ?? "";
   }
 
   /** Consume the initial %begin/%end block tmux sends on attach command. */
@@ -130,23 +145,12 @@ export class TmuxServer {
       if (inBlock && (line.startsWith("%end ") || line.startsWith("%error "))) {
         return;
       }
-      // Skip notifications and content lines
     }
   }
 
-  /**
-   * Quote an argument for tmux control mode command parsing.
-   * Args containing spaces, special chars, or tmux format sequences
-   * must be wrapped in single quotes with internal quotes escaped.
-   */
-  private quoteCcArg(arg: string): string {
-    // Empty string needs quoting
-    if (arg.length === 0) return "''";
-    // If it contains characters that need quoting, wrap in single quotes
-    if (/[\s"'\\#{}$;~]/.test(arg) || arg.startsWith("-")) {
-      return `'${arg.replace(/'/g, "'\\''")}'`;
-    }
-    return arg;
+  private async nextLine(): Promise<string> {
+    if (!this.reader) throw new StreamClosedError();
+    return this.reader.nextLine();
   }
 
   /** Send a command via control mode and await its response. Serialized via mutex. */
@@ -165,10 +169,9 @@ export class TmuxServer {
   }
 
   private async controlCommandInner(...args: string[]): Promise<string> {
-    const cmd = args.map((a) => this.quoteCcArg(a)).join(" ");
+    const cmd = args.map((a) => quoteCcArg(a)).join(" ");
     this.proc?.stdin.write(`${cmd}\n`);
 
-    // Read lines until we find %begin, then collect until %end or %error
     const output: string[] = [];
     let inBlock = false;
     while (true) {
@@ -186,7 +189,6 @@ export class TmuxServer {
       if (inBlock) {
         output.push(line);
       }
-      // Skip notifications outside blocks (%output, %window-add, etc.)
     }
   }
 
@@ -223,6 +225,7 @@ export class TmuxServer {
   async disconnect(): Promise<void> {
     if (!this.connected || !this.proc) return;
     this.connected = false;
+    this.reader = undefined;
     const proc = this.proc;
     this.proc = undefined;
 

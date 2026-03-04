@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { capturePane, sendKeys } from "./pane.ts";
+import { sendKeys } from "./pane.ts";
 import { createSession, killSession } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import type { RecordOptions } from "./types.ts";
@@ -50,10 +50,73 @@ async function waitForPaneContent(
   );
 }
 
+function buildAsciinemaCmd(
+  server: TmuxServer,
+  mainSession: string,
+  absCast: string,
+): string {
+  const tmuxFlags = server.userConf ? "" : "-f /dev/null ";
+  const attachCmd = `tmux -L ${server.socketName} ${tmuxFlags}attach -t ${mainSession}`;
+  return `asciinema rec --overwrite -c "${attachCmd}" ${absCast}`;
+}
+
+async function startHeadful(
+  server: TmuxServer,
+  mainSession: string,
+  cmd: string,
+  env: Record<string, string>,
+): Promise<RecordingHandle["headfulProc"]> {
+  const proc = Bun.spawn(["sh", "-c", cmd], {
+    stdio: ["inherit", "inherit", "inherit"],
+    env: { ...process.env, ...env },
+  });
+  await waitForPaneContent(
+    server,
+    `${mainSession}:0.0`,
+    10_000,
+    "headful startup",
+  );
+  return proc;
+}
+
+async function startHeadless(
+  server: TmuxServer,
+  mainSession: string,
+  cmd: string,
+  env: Record<string, string>,
+): Promise<void> {
+  const captureName = captureSessionName(mainSession);
+  await createSession(server, captureName);
+
+  for (const [key, value] of Object.entries(env)) {
+    await server.tmux("set-environment", "-t", captureName, key, value);
+  }
+  await server.tmux("respawn-pane", "-t", `${captureName}:0.0`, "-k");
+  await waitForPaneContent(server, `${captureName}:0.0`, 5_000, "respawn-pane");
+
+  await sendKeys(server, `${captureName}:0.0`, cmd);
+  await sendKeys(server, `${captureName}:0.0`, "\r", false);
+
+  await pollPane(
+    server,
+    `${captureName}:0.0`,
+    (c) => c.trim().length > 0 && !c.includes("asciinema rec"),
+    10_000,
+    `asciinema failed to start within 10s for session ${mainSession}`,
+    { suppressErrors: true },
+  );
+
+  await waitForPaneContent(
+    server,
+    `${mainSession}:0.0`,
+    5_000,
+    "headless main session",
+  );
+}
+
 /**
- * Start recording. In headless mode, a detached tmux session runs asciinema.
- * In headful mode, asciinema runs in the foreground via a spawned terminal process
- * so the user sees the tmux session live.
+ * Start recording. In headful mode, asciinema runs in the foreground.
+ * In headless mode, a detached tmux capture session runs asciinema.
  */
 export async function startRecording(
   server: TmuxServer,
@@ -64,71 +127,39 @@ export async function startRecording(
   const mode = opts?.mode ?? "headful";
   const absCast = resolve(castFile);
   const asc = asciinemaEnv(opts?.loadAsciinemaConf ?? false);
+  const cmd = buildAsciinemaCmd(server, mainSession, absCast);
 
-  // Build the tmux attach command with the isolated socket
-  const tmuxFlags = `${server.userConf ? "" : "-f /dev/null "}`;
-  const attachCmd = `tmux -L ${server.socketName} ${tmuxFlags}attach -t ${mainSession}`;
-
-  // Build asciinema command
-  let cmd = "asciinema rec --overwrite";
-  cmd += ` -c "${attachCmd}" ${absCast}`;
-
+  let headfulProc: RecordingHandle["headfulProc"];
   if (mode === "headful") {
-    const proc = Bun.spawn(["sh", "-c", cmd], {
-      stdio: ["inherit", "inherit", "inherit"],
-      env: { ...process.env, ...asc.env },
-    });
-    // 14a: Poll main session pane instead of fixed 1500ms sleep
-    await waitForPaneContent(
-      server,
-      `${mainSession}:0.0`,
-      10_000,
-      "headful startup",
-    );
-    return { headfulProc: proc, ascConfigDir: asc.dir, castFile: absCast };
+    headfulProc = await startHeadful(server, mainSession, cmd, asc.env);
+  } else {
+    await startHeadless(server, mainSession, cmd, asc.env);
   }
+  return { headfulProc, ascConfigDir: asc.dir, castFile: absCast };
+}
 
-  // Headless: run in a detached tmux capture session
-  const captureName = captureSessionName(mainSession);
-
-  await createSession(server, captureName);
-
-  // Set asciinema env vars via tmux set-environment (no shell eval)
-  for (const [key, value] of Object.entries(asc.env)) {
-    await server.tmux("set-environment", "-t", captureName, key, value);
-  }
-  // Respawn the pane so it inherits the new environment
-  await server.tmux("respawn-pane", "-t", `${captureName}:0.0`, "-k");
-  // 14b: Poll for shell prompt instead of fixed 300ms sleep
-  await waitForPaneContent(server, `${captureName}:0.0`, 5_000, "respawn-pane");
-
-  await sendKeys(server, `${captureName}:0.0`, cmd);
-  await sendKeys(server, `${captureName}:0.0`, "\r", false);
-
-  // Wait for asciinema to start and tmux to attach
-  const deadline = Date.now() + 10_000;
-  let ready = false;
+/** Poll until the cast file size stabilizes (3 consecutive stable reads). */
+async function waitForCastStable(
+  castFile: string,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastSize = -1;
+  let stableCount = 0;
   while (Date.now() < deadline) {
-    const content = await capturePane(server, `${captureName}:0.0`);
-    if (content.trim().length > 0 && !content.includes("asciinema rec")) {
-      ready = true;
-      break;
+    try {
+      const { size } = statSync(castFile);
+      if (size > 0 && size === lastSize) {
+        if (++stableCount >= 3) return;
+      } else {
+        stableCount = 0;
+      }
+      lastSize = size;
+    } catch {
+      stableCount = 0;
     }
-    await Bun.sleep(200);
+    await Bun.sleep(100);
   }
-  if (!ready) {
-    throw new Error(
-      `asciinema failed to start within 10s for session ${mainSession}`,
-    );
-  }
-  // 14c: Poll main session pane instead of fixed 500ms sleep
-  await waitForPaneContent(
-    server,
-    `${mainSession}:0.0`,
-    5_000,
-    "headless main session",
-  );
-  return { ascConfigDir: asc.dir, castFile: absCast };
 }
 
 /**
@@ -141,37 +172,17 @@ export async function stopRecording(
   handle?: RecordingHandle,
 ): Promise<void> {
   const captureName = captureSessionName(mainSession);
-
-  // Kill the main session → tmux attach exits → asciinema finishes
   await killSession(server, mainSession);
 
   if (handle?.headfulProc) {
     await handle.headfulProc.exited;
   } else {
-    // Poll cast file for write completion — require 3 consecutive stable reads
     if (handle?.castFile) {
-      const deadline = Date.now() + 10_000;
-      let lastSize = -1;
-      let stableCount = 0;
-      while (Date.now() < deadline) {
-        try {
-          const { size } = statSync(handle.castFile);
-          if (size > 0 && size === lastSize) {
-            if (++stableCount >= 3) break;
-          } else {
-            stableCount = 0;
-          }
-          lastSize = size;
-        } catch {
-          stableCount = 0;
-        }
-        await Bun.sleep(100);
-      }
+      await waitForCastStable(handle.castFile, 10_000);
     }
     await killSession(server, captureName);
   }
 
-  // Clean up temp asciinema config dir
   if (handle?.ascConfigDir) {
     try {
       rmSync(handle.ascConfigDir, { recursive: true });

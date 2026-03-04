@@ -2,7 +2,7 @@ import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import type { Action, Pane, Session } from "./types.ts";
-import { exec, waitForPrompt, waitForText, } from "./wait.ts";
+import { detectPrompt, exec, waitForPrompt, waitForText, } from "./wait.ts";
 
 export interface QueueConfig {
   typingDelay: number;
@@ -22,6 +22,8 @@ export function nextPlaceholder(): string {
 
 export class ActionQueue {
   /** @internal */ actions: Action[] = [];
+  /** Detected prompts keyed by pane target. */
+  private prompts = new Map<string, string>();
 
   constructor(
     private server: TmuxServer,
@@ -102,16 +104,30 @@ export class ActionQueue {
         );
         log(this.cfg, `waitForText found`);
         break;
-      case "waitForPrompt":
-        log(this.cfg, `waitForPrompt "${action.prompt}" → ${action.pane}`);
-        await waitForPrompt(
-          this.server,
-          action.pane,
-          action.prompt,
-          action.timeout,
-        );
+      case "waitForPrompt": {
+        const prompt =
+          action.prompt ?? this.prompts.get(action.pane);
+        if (prompt == null) {
+          throw new Error(
+            `waitForPrompt on ${action.pane}: no prompt given and none detected — call detectPrompt() first`,
+          );
+        }
+        log(this.cfg, `waitForPrompt "${prompt}" → ${action.pane}`);
+        await waitForPrompt(this.server, action.pane, prompt, action.timeout);
         log(this.cfg, `waitForPrompt found`);
         break;
+      }
+      case "detectPrompt": {
+        log(this.cfg, `detectPrompt → ${action.pane}`);
+        const detected = await detectPrompt(
+          this.server,
+          action.pane,
+          action.timeout,
+        );
+        this.prompts.set(action.pane, detected);
+        log(this.cfg, `detectPrompt found "${detected}"`);
+        break;
+      }
       case "splitH":
       case "splitV": {
         const dir = action.kind === "splitH" ? "h" : "v";
@@ -162,8 +178,12 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "waitForText", pane: target, text, timeout });
       return api;
     },
-    waitForPrompt(prompt: string, timeout?: number) {
+    waitForPrompt(prompt?: string, timeout?: number) {
       queue.push({ kind: "waitForPrompt", pane: target, prompt, timeout });
+      return api;
+    },
+    detectPrompt(timeout?: number) {
+      queue.push({ kind: "detectPrompt", pane: target, timeout });
       return api;
     },
     waitForTitle(title: string, timeout?: number) {

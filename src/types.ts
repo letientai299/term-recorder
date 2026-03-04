@@ -41,7 +41,8 @@ export interface ActionDefs {
   exec: { pane: string; cmd: string; timeout?: number };
   sleep: { ms: number };
   waitForText: { pane: string; text: string; timeout?: number };
-  waitForPrompt: { pane: string; prompt: string; timeout?: number };
+  waitForPrompt: { pane: string; prompt?: string; timeout?: number };
+  detectPrompt: { pane: string; timeout?: number };
   waitForTitle: { pane: string; title: string; timeout?: number };
   splitH: { session: string; percent?: number; placeholder?: string };
   splitV: { session: string; percent?: number; placeholder?: string };
@@ -100,10 +101,18 @@ export interface Pane {
   /**
    * Block until the last non-empty line in the pane contains `prompt`.
    * Useful for waiting until a shell or REPL is ready for input.
+   * When called with no prompt, uses the value from a prior {@link detectPrompt} call.
    * @param prompt - Substring to match on the last line (e.g. `"$"`, `">>>"`, `"%"`).
    * @param timeout - Max wait time in ms. Default: 10 000.
    */
-  waitForPrompt(prompt: string, timeout?: number): Pane;
+  waitForPrompt(prompt?: string, timeout?: number): Pane;
+  /**
+   * Detect the prompt string of the current shell or REPL. Types a random marker,
+   * captures the pane to find the text preceding it (the prompt), then erases the marker.
+   * The detected prompt is stored and used by subsequent {@link waitForPrompt} calls with no argument.
+   * @param timeout - Max wait time in ms. Default: 10 000.
+   */
+  detectPrompt(timeout?: number): Pane;
   /**
    * Block until the tmux pane title contains `title`.
    * Polls every 100ms via `display-message #{pane_title}`.

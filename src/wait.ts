@@ -1,8 +1,8 @@
-import { capturePane, getPaneTitle } from "./pane.ts";
+import { capturePane, getPaneTitle, sendKeys } from "./pane.ts";
 import type { TmuxServer } from "./shell.ts";
 
-const DEFAULT_TIMEOUT = 10_000;
-const POLL_INTERVAL = 100;
+const DEFAULT_TIMEOUT = 5_000;
+const POLL_INTERVAL = 50;
 
 /**
  * Generic pane poller — captures pane content until `predicate` returns true.
@@ -88,6 +88,39 @@ export async function waitForTitle(
   );
 }
 
+/**
+ * Detect the prompt string by sending a random marker and inspecting where it lands.
+ * Types the marker (no Enter), captures the pane to find the prompt prefix,
+ * then erases the marker with backspaces.
+ */
+export async function detectPrompt(
+  server: TmuxServer,
+  target: string,
+  timeout = DEFAULT_TIMEOUT,
+): Promise<string> {
+  await Bun.sleep(POLL_INTERVAL);
+  const marker = `__tr_probe_${crypto.randomUUID().slice(0, 8)}__`;
+
+  await sendKeys(server, target, marker);
+  await waitForText(server, target, marker, timeout);
+
+  const content = await capturePane(server, target);
+
+  // Erase the marker with backspaces
+  for (let i = 0; i < marker.length; i++) {
+    await server.tmux("send-keys", "-t", target, "BSpace");
+  }
+
+  for (const line of content.split("\n")) {
+    const idx = line.indexOf(marker);
+    // Trim trailing whitespace — capture-pane strips it from lines,
+    // so a prompt like ">>> " would never match the captured last line.
+    if (idx >= 0) return line.slice(0, idx).trimEnd();
+  }
+
+  throw new Error(`detectPrompt: marker not found in pane content`);
+}
+
 let channelCounter = 0;
 
 /**
@@ -116,9 +149,7 @@ export async function exec(
     timer = setTimeout(
       () =>
         reject(
-          new Error(
-            `exec("${cmd}") timed out after ${timeout}ms on ${target}`,
-          ),
+          new Error(`exec("${cmd}") timed out after ${timeout}ms on ${target}`),
         ),
       timeout,
     );

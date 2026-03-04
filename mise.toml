@@ -10,5 +10,6 @@ run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
 
 [tasks.record]
-run = "bun examples/main.ts {{arg(name=\"flags\", var=true)}}"
+raw = true
+run = "bun examples/main.ts \"$@\""
 description = "Record demos (pass --headless, --filter, etc.)"

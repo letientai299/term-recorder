@@ -8,12 +8,9 @@ import { TmuxServer } from "./shell.ts";
 import type { RecordOptions } from "./types.ts";
 
 interface CliFlags {
+  help: boolean;
   headless: boolean;
-  headful: boolean;
-  concurrency?: number;
-  cols?: number;
-  rows?: number;
-  idleTimeLimit?: number;
+  parallel?: number;
   outputDir?: string;
   filter?: string;
   loadTmuxConf: boolean;
@@ -25,12 +22,9 @@ export function parseCliFlags(argv: string[]): CliFlags {
   const { values } = parseArgs({
     args: argv,
     options: {
+      help: { type: "boolean", default: false, short: "h" },
       headless: { type: "boolean", default: false },
-      headful: { type: "boolean", default: false },
-      concurrency: { type: "string" },
-      cols: { type: "string" },
-      rows: { type: "string" },
-      "idle-time-limit": { type: "string" },
+      parallel: { type: "string", short: "p" },
       "output-dir": { type: "string", short: "o" },
       filter: { type: "string", short: "f" },
       "load-tmux-conf": { type: "boolean", default: false },
@@ -49,12 +43,9 @@ export function parseCliFlags(argv: string[]): CliFlags {
   };
 
   return {
+    help: values.help === true,
     headless: values.headless === true,
-    headful: values.headful === true,
-    concurrency: parseIntOpt(values.concurrency),
-    cols: parseIntOpt(values.cols),
-    rows: parseIntOpt(values.rows),
-    idleTimeLimit: parseIntOpt(values["idle-time-limit"]),
+    parallel: parseIntOpt(values.parallel),
     outputDir: values["output-dir"] as string | undefined,
     filter: values.filter as string | undefined,
     loadTmuxConf: values["load-tmux-conf"] === true,
@@ -64,16 +55,11 @@ export function parseCliFlags(argv: string[]): CliFlags {
 }
 
 function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
-  // CLI flags > config > built-in defaults
-  const mode = cli.headless
-    ? "headless"
-    : cli.headful
-      ? "headful"
-      : (config.mode ?? "headful");
+  const mode = cli.headless ? "headless" : (config.mode ?? "headful");
   return {
-    cols: cli.cols ?? config.cols,
-    rows: cli.rows ?? config.rows,
-    idleTimeLimit: cli.idleTimeLimit ?? config.idleTimeLimit,
+    cols: config.cols,
+    rows: config.rows,
+    idleTimeLimit: config.idleTimeLimit,
     mode,
     shell: config.shell,
     typingDelay: config.typingDelay,
@@ -158,6 +144,28 @@ export async function main(
   recordings: Recording[],
 ): Promise<void> {
   const cli = parseCliFlags(process.argv.slice(2));
+
+  if (cli.help) {
+    const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
+    console.log(`Record terminal demos to asciicast files.
+
+Usage: bun <script> [options]
+
+Recordings:
+${recordings.map((r) => `  ${join(outputDir, `${r.name}.cast`)}`).join("\n")}
+
+Options:
+  -h, --help                Show this help message
+  --headless                Run headless with auto-parallel (cpus/2)
+  -p, --parallel N          Max parallel recordings
+  -o, --output-dir DIR      Output directory (default: ./casts)
+  -f, --filter REGEX        Filter recordings by name
+  --load-tmux-conf          Load user's tmux.conf
+  --load-asciinema-conf     Load user's asciinema config
+  --dry-run                 Print recording names and exit`);
+    return;
+  }
+
   const opts = resolveOptions(config, cli);
   const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
 
@@ -179,7 +187,9 @@ export async function main(
       re = new RegExp(cli.filter);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      console.error(`Error: invalid --filter regex "${cli.filter}": ${reason}`);
+      console.error(
+        `Error: invalid --filter regex "${cli.filter}": ${reason}`,
+      );
       process.exit(1);
     }
     filtered = recordings.filter((r) => re.test(r.name));
@@ -201,7 +211,7 @@ export async function main(
 
   // Determine concurrency: explicit flag > auto (cpus/2 for headless, 1 for headful)
   const concurrency =
-    cli.concurrency ??
+    cli.parallel ??
     (opts.mode === "headless"
       ? Math.max(1, Math.floor(cpus().length / 2))
       : 1);
@@ -210,9 +220,7 @@ export async function main(
     `Recording ${filtered.length} cast${filtered.length > 1 ? "s" : ""} → ${outputDir} (${opts.mode}, concurrency: ${concurrency})`,
   );
 
-  const tasks = filtered.map(
-    (rec) => () => runOne(rec, opts, outputDir),
-  );
+  const tasks = filtered.map((rec) => () => runOne(rec, opts, outputDir));
   const results = await runWithConcurrency(tasks, concurrency);
 
   // Report

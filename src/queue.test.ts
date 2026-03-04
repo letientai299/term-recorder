@@ -3,7 +3,7 @@ import {
   ActionQueue,
   createPaneProxy,
   createSessionProxy,
-} from "../src/queue.ts";
+} from "./queue.ts";
 
 describe("ActionQueue", () => {
   test("queues actions without executing", () => {

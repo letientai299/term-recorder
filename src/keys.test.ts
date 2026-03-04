@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ctrl, KEYS } from "../src/keys.ts";
+import { ctrl, KEYS } from "./keys.ts";
 
 describe("KEYS map", () => {
   test("contains common keys", () => {

@@ -78,4 +78,4 @@ export function testSessionName(): string {
  * Set up an isolated tmux server for integration tests.
  * Call in beforeAll/afterAll to avoid hitting user's tmux.conf.
  */
-export { initServer, resetServer } from "../src/shell.ts";
+export { initServer, resetServer } from "./shell.ts";

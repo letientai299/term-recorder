@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { sendKeys } from "../src/pane.ts";
-import { createSession, killSession } from "../src/session.ts";
-import { exec, waitForText } from "../src/wait.ts";
-import { initServer, resetServer, testSessionName } from "./helpers.ts";
+import { sendKeys } from "./pane.ts";
+import { createSession, killSession } from "./session.ts";
+import { exec, waitForText } from "./wait.ts";
+import { initServer, resetServer, testSessionName } from "./test-helpers.ts";
 
 let sessionName: string;
 

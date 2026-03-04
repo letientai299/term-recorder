@@ -4,8 +4,8 @@ import {
   killSession,
   listPanes,
   splitPane,
-} from "../src/session.ts";
-import { initServer, resetServer, testSessionName } from "./helpers.ts";
+} from "./session.ts";
+import { initServer, resetServer, testSessionName } from "./test-helpers.ts";
 
 let sessions: string[] = [];
 

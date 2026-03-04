@@ -7,6 +7,9 @@ export const DEFAULT_ACTION_DELAY_MS = 200;
 /** Idle time before ending recording so the last frame stays visible. */
 export const DEFAULT_TRAILING_DELAY_MS = 1000;
 
+/** Default per-pane pace delay in ms. */
+export const DEFAULT_PACE_MS = 1000;
+
 /**
  * Low-level options for {@link executeRecording}.
  * Most users should use {@link Config} with {@link main} instead — `main()` resolves
@@ -35,6 +38,8 @@ export interface RecordOptions {
   sessionName?: string;
   /** Extra idle time (ms) before ending the recording, so the last frame stays visible on playback. Default: 1000. Set to 0 to disable. */
   trailingDelay?: number;
+  /** Default per-pane pace delay in ms. Default: 1000. Set to 0 to disable. */
+  pace?: number;
 }
 
 import type { Key } from "./keys.ts";
@@ -50,6 +55,7 @@ export interface ActionDefs {
   waitForPrompt: { pane: string; prompt?: string; timeout?: number };
   detectPrompt: { pane: string; timeout?: number };
   waitForTitle: { pane: string; title: string; timeout?: number };
+  pace: { pane: string; ms: number };
   splitH: { session: string; percent?: number; placeholder?: string };
   splitV: { session: string; percent?: number; placeholder?: string };
 }
@@ -91,6 +97,8 @@ export interface Pane {
   enter(): Pane;
   /** Pause for a fixed duration. Does not add an extra {@link Config.actionDelay} after itself. */
   sleep(ms: number): Pane;
+  /** Set a minimum per-pane delay (ms) applied after each action. `pace(0)` resets to default. */
+  pace(ms: number): Pane;
   /**
    * Block until `text` appears anywhere in the pane content.
    * Re-checks on `%output` notifications with a 500ms fallback poll.
@@ -125,8 +133,6 @@ export interface Pane {
   run(text: string): Pane;
   /** Type text, press Enter, then wait for the detected prompt to reappear. Requires a prior `detectPrompt()`. */
   reply(text: string, timeout?: number): Pane;
-  /** Pause for a fixed duration. Like {@link sleep} but defaults to 1 000 ms. */
-  pause(ms?: number): Pane;
 }
 
 /**
@@ -137,7 +143,6 @@ export interface Session extends Pane {
   sleep(ms: number): Session;
   run(text: string): Session;
   reply(text: string, timeout?: number): Session;
-  pause(ms?: number): Session;
   /**
    * Split the session horizontally (side by side). Returns a {@link Pane}
    * targeting the new right pane.

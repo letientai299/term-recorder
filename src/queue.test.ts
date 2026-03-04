@@ -4,7 +4,7 @@ import { TmuxServer } from "./shell.ts";
 import type { ActionOf } from "./types.ts";
 
 const server = new TmuxServer("test-queue-dummy");
-const cfg = { typingDelay: 100, actionDelay: 0, headless: false };
+const cfg = { typingDelay: 100, actionDelay: 0, headless: false, pace: 0 };
 
 describe("ActionQueue", () => {
   test("queues actions without executing", () => {
@@ -25,6 +25,18 @@ describe("createPaneProxy", () => {
       kind: "send",
       pane: "test:0.0",
       text: "hello",
+    });
+  });
+
+  test("queues pace action", () => {
+    const queue = new ActionQueue(server, cfg);
+    const pane = createPaneProxy(queue, "test:0.0");
+    pane.pace(500);
+    expect(queue.actions).toHaveLength(1);
+    expect(queue.actions[0]).toEqual({
+      kind: "pace",
+      pane: "test:0.0",
+      ms: 500,
     });
   });
 

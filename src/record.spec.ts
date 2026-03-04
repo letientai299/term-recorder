@@ -13,7 +13,7 @@ describe("record (e2e)", () => {
   test("produces a valid cast file", async () => {
     await executeRecording(
       CAST_FILE,
-      { mode: "headless", trailingDelay: 0 },
+      { mode: "headless", trailingDelay: 0, pace: 0 },
       (s) => {
       s.type("echo hello-from-record").enter();
       s.sleep(1);

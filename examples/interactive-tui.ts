@@ -15,28 +15,23 @@ const vim = record("vim-edit", (s) => {
   s.detectPrompt();
   s.reply("echo 'hello world' > /tmp/tr-test.txt");
   s.run("vim /tmp/tr-test.txt");
-  s.pause();
   s.key("Down");
   s.type("o");
   s.type("added by term-recorder");
   s.key("Escape");
   s.run(":wq");
-  s.pause(500);
   s.run("cat /tmp/tr-test.txt");
-  s.pause();
+  s.pace(0);
   s.reply("rm /tmp/tr-test.txt");
 });
 
 const less = record("less-pager", (s) => {
   s.run("seq 200 | less");
-  s.pause();
   s.key("Space");
-  s.pause(500);
   s.key("Space");
-  s.pause(500);
   s.type("/150").enter();
-  s.pause(500);
   s.type("q");
+  s.pace(0);
 });
 
 const recordings = [py, vim, less];

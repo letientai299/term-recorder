@@ -17,6 +17,7 @@ interface CliFlags {
   loadAsciinemaConf: boolean;
   dryRun: boolean;
   trailingDelay?: number;
+  pace?: number;
 }
 
 export function parseCliFlags(argv: string[]): CliFlags {
@@ -32,6 +33,7 @@ export function parseCliFlags(argv: string[]): CliFlags {
       "load-asciinema-conf": { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       "trailing-delay": { type: "string" },
+      pace: { type: "string" },
     },
     strict: true,
   });
@@ -53,6 +55,7 @@ export function parseCliFlags(argv: string[]): CliFlags {
     loadAsciinemaConf: values["load-asciinema-conf"],
     dryRun: values["dry-run"],
     trailingDelay: parseIntOpt(values["trailing-delay"], 0),
+    pace: parseIntOpt(values.pace, 0),
   };
 }
 
@@ -66,6 +69,7 @@ export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
     loadAsciinemaConf:
       cli.loadAsciinemaConf || (config.loadAsciinemaConf ?? false),
     trailingDelay: cli.trailingDelay ?? config.trailingDelay,
+    pace: cli.pace ?? config.pace,
   };
 }
 
@@ -80,6 +84,7 @@ const CLI_OPTIONS: Array<[flags: string, arg: string, desc: string]> = [
   ["--load-tmux-conf", "", "Load user's tmux.conf"],
   ["--load-asciinema-conf", "", "Load user's asciinema config"],
   ["--trailing-delay", "MS", "Idle time after last action (default: 1000)"],
+  ["--pace", "MS", "Default per-pane pace delay (default: 1000, 0 to disable)"],
   ["--dry-run", "", "Print recording names and exit"],
 ];
 

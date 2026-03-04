@@ -16,6 +16,7 @@ export interface QueueConfig {
   typingDelay: number;
   actionDelay: number;
   headless: boolean;
+  pace: number;
 }
 
 function log(cfg: QueueConfig, msg: string): void {
@@ -32,6 +33,8 @@ export class ActionQueue {
   /** @internal */ actions: Action[] = [];
   /** Detected prompts keyed by pane target. */
   private prompts = new Map<string, string>();
+  /** Per-pane minimum delay (ms) set via `pace()`. */
+  private paces = new Map<string, number>();
 
   constructor(
     private server: TmuxServer,
@@ -47,9 +50,12 @@ export class ActionQueue {
       const action = this.actions.shift();
       if (!action) break;
       await this.execute(action);
-      // Auto-pause between actions (skip for sleep — already a pause)
-      if (action.kind !== "sleep" && this.cfg.actionDelay > 0) {
-        await sleep(this.cfg.actionDelay);
+      // Auto-pause between actions (skip for sleep and pace)
+      if (action.kind !== "sleep" && action.kind !== "pace") {
+        const pane = "pane" in action ? action.pane : undefined;
+        const paceMs = pane ? (this.paces.get(pane) ?? this.cfg.pace) : 0;
+        const delay = Math.max(this.cfg.actionDelay, paceMs);
+        if (delay > 0) await sleep(delay);
       }
     }
   }
@@ -86,6 +92,9 @@ export class ActionQueue {
     },
     sleep: async (a) => {
       await sleep(a.ms);
+    },
+    pace: async (a) => {
+      this.paces.set(a.pane, a.ms);
     },
     waitForText: async (a) => {
       await waitForText(this.server, a.pane, a.text, a.timeout);
@@ -165,6 +174,10 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "sleep", ms });
       return api;
     },
+    pace(ms: number) {
+      queue.push({ kind: "pace", pane: target, ms });
+      return api;
+    },
     waitForText(text: string, timeout?: number) {
       queue.push({ kind: "waitForText", pane: target, text, timeout });
       return api;
@@ -190,10 +203,6 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "type", pane: target, text });
       queue.push({ kind: "enter", pane: target });
       queue.push({ kind: "waitForPrompt", pane: target, timeout });
-      return api;
-    },
-    pause(ms?: number) {
-      queue.push({ kind: "sleep", ms: ms ?? 1000 });
       return api;
     },
   };
@@ -228,10 +237,6 @@ export function createSessionProxy(
       queue.push({ kind: "type", pane: defaultTarget, text });
       queue.push({ kind: "enter", pane: defaultTarget });
       queue.push({ kind: "waitForPrompt", pane: defaultTarget, timeout });
-      return api;
-    },
-    pause(ms?: number) {
-      queue.push({ kind: "sleep", ms: ms ?? 1000 });
       return api;
     },
     splitH: (percent?: number) => split("splitH", percent),

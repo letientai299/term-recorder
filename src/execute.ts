@@ -6,6 +6,7 @@ import { createSession } from "./session.ts";
 import { TmuxServer } from "./shell.ts";
 import {
   DEFAULT_ACTION_DELAY_MS,
+  DEFAULT_PACE_MS,
   DEFAULT_TRAILING_DELAY_MS,
   DEFAULT_TYPING_DELAY_MS,
   type RecordOptions,
@@ -55,6 +56,7 @@ export async function executeRecording(
       typingDelay: Math.max(0, opts.typingDelay ?? DEFAULT_TYPING_DELAY_MS),
       actionDelay: Math.max(0, opts.actionDelay ?? DEFAULT_ACTION_DELAY_MS),
       headless: (opts.mode ?? "headful") === "headless",
+      pace: Math.max(0, opts.pace ?? DEFAULT_PACE_MS),
     };
     const queue = new ActionQueue(srv, queueCfg);
     const session = createSessionProxy(queue, name);

@@ -7,7 +7,7 @@ const claude = record("claude", (s) => {
   s.detectPrompt(30_000);
   s.type("what is 2+2?").key("Enter");
   s.waitForText("4", 30_000);
-  s.send("\x04"); // Ctrl+D to exit
+  s.key("ctrl-d"); // exit
   s.send("echo hello");
 });
 

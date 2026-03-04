@@ -1,3 +1,4 @@
+import type { Key } from "./keys.ts";
 import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
@@ -156,7 +157,7 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "type", pane: target, text, delayMs });
       return api;
     },
-    key(name: string) {
+    key(name: Key) {
       queue.push({ kind: "key", pane: target, name });
       return api;
     },

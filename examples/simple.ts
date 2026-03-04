@@ -1,4 +1,4 @@
-import { ctrl, defineConfig, main, record } from "../src";
+import { defineConfig, main, record } from "../src";
 
 const config = defineConfig({});
 
@@ -30,7 +30,7 @@ const keys = record("keys-ctrl", (s) => {
   s.run("echo 'second command'");
   s.key("Up").key("Up").key("Down").enter();
   s.type("this-will-be-cancelled");
-  s.send(ctrl("c"));
+  s.key("ctrl-c");
   s.run("echo 'Ctrl+C worked, back to clean prompt'");
 });
 

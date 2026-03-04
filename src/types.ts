@@ -37,11 +37,13 @@ export interface RecordOptions {
   trailingDelay?: number;
 }
 
+import type { Key } from "./keys.ts";
+
 /** Single source of truth for every action kind and its payload (excluding `kind` itself). */
 export interface ActionDefs {
   send: { pane: string; text: string };
   type: { pane: string; text: string; delayMs?: number };
-  key: { pane: string; name: string };
+  key: { pane: string; name: Key };
   enter: { pane: string };
   exec: { pane: string; cmd: string; timeout?: number };
   sleep: { ms: number };
@@ -82,8 +84,10 @@ export interface Pane {
    * Send a named key. Available names: `Escape`, `Enter`, `Tab`, `Backspace`, `Space`,
    * `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `Insert`, `Delete`,
    * `PageUp`, `PageDown`, `F1`–`F12`.
+   *
+   * Modifier combos are also supported: `"ctrl-c"`, `"alt-x"`, `"shift-Tab"`.
    */
-  key(name: string): Pane;
+  key(name: Key): Pane;
   /** Press Enter. Shorthand for `.key("Enter")`. */
   enter(): Pane;
   /**

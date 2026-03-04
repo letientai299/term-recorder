@@ -1,4 +1,5 @@
-import { KEYS } from "./keys.ts";
+import type { Key } from "./keys.ts";
+import { resolveKey } from "./keys.ts";
 import type { TmuxServer } from "./shell.ts";
 
 /**
@@ -32,20 +33,16 @@ export async function sendKeys(
 }
 
 /**
- * Send a named key using tmux key names (e.g. "Enter", "Up", "BSpace").
- * Keys are sent without `-l` so tmux translates them to the appropriate
- * escape sequences for the pane's terminal.
+ * Send a named key (with optional modifier) to a tmux pane.
+ * Accepts any value from the {@link Key} type: plain names like `"Enter"`,
+ * or modifier combos like `"ctrl-c"`, `"alt-x"`, `"shift-Tab"`.
  */
 export async function sendKey(
   server: TmuxServer,
   target: string,
-  keyName: string,
+  key: Key,
 ): Promise<void> {
-  const tmuxName = KEYS[keyName];
-  if (!tmuxName)
-    throw new Error(
-      `Unknown key: "${keyName}". Available: ${Object.keys(KEYS).join(", ")}`,
-    );
+  const tmuxName = resolveKey(key);
   await server.tmux("send-keys", "-t", target, tmuxName);
 }
 

@@ -8,7 +8,7 @@ const copilot = record("copilot", (s) => {
   );
   s.detectPrompt(30_000);
   s.reply("print the current day of week and calendar day as Monday, 5th", 30_000);
-  s.send("\x03"); // Ctrl+C to exit
+  s.key("ctrl-c"); // exit
   s.send("echo hello");
 });
 

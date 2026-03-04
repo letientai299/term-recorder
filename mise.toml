@@ -1,5 +1,6 @@
 [tools]
 bun = "latest"
+"cargo:prek" = "latest"
 
 [tasks.test]
 run = "bun test -- src/*.test.ts"

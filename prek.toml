@@ -1,0 +1,18 @@
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "fmt", name = "fmt", entry = "mise run fmt", language = "system", pass_filenames = false, stages = [
+    "pre-commit",
+  ] },
+  { id = "lint", name = "lint", entry = "mise lint", language = "system", pass_filenames = false, stages = [
+    "pre-commit",
+  ] },
+  { id = "test", name = "test", entry = "mise test", language = "system", pass_filenames = false, stages = [
+    "pre-commit",
+  ] },
+  { id = "e2e", name = "e2e", entry = "mise e2e", language = "system", pass_filenames = false, stages = [
+    "pre-push",
+  ] },
+]

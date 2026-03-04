@@ -43,10 +43,10 @@ export async function executeRecording(
   let recording: Awaited<ReturnType<typeof startRecording>> | undefined;
   try {
     await createSession(srv, name, opts);
-    recording = await startRecording(srv, name, castFile, opts);
 
-    // Switch to control mode for the action queue (faster than subprocess-per-command)
+    // Connect control mode early so startRecording's pollPane calls get %output hints
     await srv.connect(name);
+    recording = await startRecording(srv, name, castFile, opts);
 
     const queueCfg: QueueConfig = {
       typingDelay: Math.max(0, opts.typingDelay ?? DEFAULT_TYPING_DELAY_MS),
@@ -62,7 +62,7 @@ export async function executeRecording(
     await queue.drain();
 
     // Brief pause so asciinema captures the final frame (~25ms capture interval)
-    await Bun.sleep(200);
+    await Bun.sleep(50);
   } finally {
     // Disconnect control mode before killing sessions
     await srv.disconnect();

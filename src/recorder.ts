@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync, watch } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sendKeys } from "./pane.ts";
@@ -134,8 +134,55 @@ export async function startRecording(
   return { headfulProc, ascConfigDir: asc.dir, castFile: absCast };
 }
 
-/** Poll until the cast file size stabilizes (3 consecutive stable reads). */
+/**
+ * Wait until the cast file stops being written to.
+ * Uses fs.watch() to detect changes and resolves after 150ms of silence.
+ * Falls back to statSync polling if fs.watch() is unavailable.
+ */
 async function waitForCastStable(
+  castFile: string,
+  timeoutMs: number,
+): Promise<void> {
+  try {
+    await waitForCastStableWatch(castFile, timeoutMs);
+  } catch {
+    await waitForCastStablePoll(castFile, timeoutMs);
+  }
+}
+
+/** Primary: fs.watch()-based silence detection. */
+function waitForCastStableWatch(
+  castFile: string,
+  timeoutMs: number,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const watcher = watch(castFile);
+    let silenceTimer = setTimeout(done, 150);
+    const deadline = setTimeout(() => done(), timeoutMs);
+
+    function done() {
+      clearTimeout(silenceTimer);
+      clearTimeout(deadline);
+      watcher.close();
+      resolve();
+    }
+
+    watcher.on("change", () => {
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(done, 150);
+    });
+
+    watcher.on("error", (err) => {
+      clearTimeout(silenceTimer);
+      clearTimeout(deadline);
+      watcher.close();
+      reject(err);
+    });
+  });
+}
+
+/** Fallback: poll statSync for 3 consecutive stable reads. */
+async function waitForCastStablePoll(
   castFile: string,
   timeoutMs: number,
 ): Promise<void> {

@@ -2,11 +2,58 @@ import { capturePane, getPaneTitle, sendKeys } from "./pane.ts";
 import type { TmuxServer } from "./shell.ts";
 
 const DEFAULT_TIMEOUT = 5_000;
-const POLL_INTERVAL = 50;
+
+/** Slow fallback interval when no %output hint arrives. */
+const FALLBACK_POLL_MS = 500;
 
 /**
- * Generic pane poller — captures pane content until `predicate` returns true.
- * Set `suppressErrors` to swallow capture failures (e.g. pane not yet created).
+ * Wait for `%output` or a timeout — whichever comes first.
+ * Returns immediately when the server emits an output notification,
+ * allowing the caller to re-check a predicate without blind polling.
+ */
+function waitForOutputHint(server: TmuxServer, ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      server.offOutput(cb);
+      resolve();
+    }, ms);
+    const cb = () => {
+      clearTimeout(timer);
+      server.offOutput(cb);
+      resolve();
+    };
+    server.onOutput(cb);
+  });
+}
+
+/**
+ * Wait until no `%output` arrives within the given silence window.
+ * Resolves immediately if the server is not in control mode (no %output support).
+ */
+function waitForOutputSilence(server: TmuxServer, ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let timer = setTimeout(done, ms);
+    const cb = () => {
+      clearTimeout(timer);
+      timer = setTimeout(done, ms);
+    };
+    function done() {
+      server.offOutput(cb);
+      resolve();
+    }
+    server.onOutput(cb);
+  });
+}
+
+/**
+ * Generic pane poller — fetches data until `predicate` returns true.
+ * By default fetches via `capture-pane`; pass `opts.fetch` to override.
+ *
+ * When the server is in control mode, uses `%output` notifications as
+ * hints to re-check immediately instead of blind polling. Falls back
+ * to {@link FALLBACK_POLL_MS} between checks when no output arrives.
+ *
+ * Set `suppressErrors` to swallow fetch failures (e.g. pane not yet created).
  */
 export async function pollPane(
   server: TmuxServer,
@@ -14,17 +61,20 @@ export async function pollPane(
   predicate: (content: string) => boolean,
   timeout: number,
   label: string,
-  opts?: { suppressErrors?: boolean },
+  opts?: { suppressErrors?: boolean; fetch?: () => Promise<string> },
 ): Promise<void> {
+  const getData = opts?.fetch ?? (() => capturePane(server, target));
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     try {
-      const content = await capturePane(server, target);
+      const content = await getData();
       if (predicate(content)) return;
     } catch (err) {
       if (!opts?.suppressErrors) throw err;
     }
-    await Bun.sleep(POLL_INTERVAL);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await waitForOutputHint(server, Math.min(FALLBACK_POLL_MS, remaining));
   }
   throw new Error(`${label} timed out after ${timeout}ms on ${target}`);
 }
@@ -88,12 +138,8 @@ export async function waitForTitle(
 
   await server.subscribe(name, target, "#{pane_title}");
   try {
-    await server.waitForSubscription(
-      name,
-      (v) => v.includes(title),
-      timeout,
-    );
-  } catch (err) {
+    await server.waitForSubscription(name, (v) => v.includes(title), timeout);
+  } catch (_err) {
     throw new Error(
       `waitForTitle("${title}") timed out after ${timeout}ms on ${target}`,
     );
@@ -112,7 +158,7 @@ export async function detectPrompt(
   target: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<string> {
-  await Bun.sleep(POLL_INTERVAL);
+  await waitForOutputSilence(server, FALLBACK_POLL_MS);
   const marker = `__tr_probe_${crypto.randomUUID().slice(0, 8)}__`;
 
   await sendKeys(server, target, marker);
@@ -121,7 +167,7 @@ export async function detectPrompt(
   const content = await capturePane(server, target);
 
   // Erase the marker with backspaces
-  for (let i = 0; i < marker.length; i++) {
+  for (const _ of marker) {
     await server.tmux("send-keys", "-t", target, "BSpace");
   }
 

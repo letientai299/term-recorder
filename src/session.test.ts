@@ -5,7 +5,7 @@ import {
   listPanes,
   splitPane,
 } from "./session.ts";
-import { initServer, resetServer, testSessionName } from "./test-helpers.ts";
+import { initServer, resetServer, testSessionName } from "./test-helpers.test.ts";
 
 let sessions: string[] = [];
 

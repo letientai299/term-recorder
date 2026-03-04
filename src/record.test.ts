@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { record } from "./index.ts";
-import { castCols, castContains, castHeader, castRows } from "./test-helpers.ts";
+import { castCols, castContains, castHeader, castRows } from "./test-helpers.test.ts";
 
 const CAST_FILE = "/tmp/test-record.cast";
 

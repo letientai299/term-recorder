@@ -32,17 +32,30 @@ export interface RecordOptions {
   sessionName?: string;
 }
 
-export type Action =
-  | { kind: "send"; pane: string; text: string }
-  | { kind: "type"; pane: string; text: string; delayMs?: number }
-  | { kind: "key"; pane: string; name: string }
-  | { kind: "enter"; pane: string }
-  | { kind: "exec"; pane: string; cmd: string; timeout?: number }
-  | { kind: "sleep"; ms: number }
-  | { kind: "waitForText"; pane: string; text: string; timeout?: number }
-  | { kind: "waitForPrompt"; pane: string; prompt: string; timeout?: number }
-  | { kind: "splitH"; session: string; percent?: number; placeholder?: string }
-  | { kind: "splitV"; session: string; percent?: number; placeholder?: string };
+/** Single source of truth for every action kind and its payload (excluding `kind` itself). */
+export interface ActionDefs {
+  send: { pane: string; text: string };
+  type: { pane: string; text: string; delayMs?: number };
+  key: { pane: string; name: string };
+  enter: { pane: string };
+  exec: { pane: string; cmd: string; timeout?: number };
+  sleep: { ms: number };
+  waitForText: { pane: string; text: string; timeout?: number };
+  waitForPrompt: { pane: string; prompt: string; timeout?: number };
+  splitH: { session: string; percent?: number; placeholder?: string };
+  splitV: { session: string; percent?: number; placeholder?: string };
+}
+
+/** Union of all valid `kind` strings. */
+export type ActionKind = keyof ActionDefs;
+
+/** Tagged union derived from {@link ActionDefs}. */
+export type Action = {
+  [K in ActionKind]: { kind: K } & ActionDefs[K];
+}[ActionKind];
+
+/** Narrow {@link Action} to a specific kind. */
+export type ActionOf<K extends ActionKind> = Extract<Action, { kind: K }>;
 
 /**
  * Actions available on a single tmux pane. All methods are chainable

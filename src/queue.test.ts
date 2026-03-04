@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ActionQueue, createPaneProxy, createSessionProxy } from "./queue.ts";
 import { TmuxServer } from "./shell.ts";
+import type { ActionOf } from "./types.ts";
 
 const server = new TmuxServer("test-queue-dummy");
 const cfg = { typingDelay: 100, actionDelay: 0, headless: false };
@@ -76,19 +77,13 @@ describe("createSessionProxy", () => {
     const pane2 = session.splitH(50);
     pane2.send("in pane 2");
     expect(queue.actions).toHaveLength(2);
-    const split = queue.actions[0] as Extract<
-      (typeof queue.actions)[0],
-      { kind: "splitH" }
-    >;
+    const split = queue.actions[0] as ActionOf<"splitH">;
     expect(split.kind).toBe("splitH");
     expect(split.session).toBe("test-session");
     expect(split.percent).toBe(50);
     expect(split.placeholder).toBeString();
     // The type action targets the same placeholder — resolved at drain time
-    const typeAction = queue.actions[1] as Extract<
-      (typeof queue.actions)[0],
-      { kind: "type" }
-    >;
+    const typeAction = queue.actions[1] as ActionOf<"type">;
     expect(typeAction.pane).toBe(split.placeholder as string);
     expect(typeAction.text).toBe("in pane 2");
   });

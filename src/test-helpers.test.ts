@@ -26,14 +26,6 @@ interface CastFile {
   events: CastEvent[];
 }
 
-export function castCols(header: CastHeader): number {
-  return header.version === 3 ? header.term.cols : header.width;
-}
-
-export function castRows(header: CastHeader): number {
-  return header.version === 3 ? header.term.rows : header.height;
-}
-
 /**
  * Parse an asciicast v2/v3 file (NDJSON format).
  */

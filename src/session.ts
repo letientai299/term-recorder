@@ -4,20 +4,9 @@ import type { RecordOptions } from "./types.ts";
 export async function createSession(
   server: TmuxServer,
   name: string,
-  cols: number,
-  rows: number,
   opts?: Pick<RecordOptions, "env" | "cwd" | "tmux" | "shell">,
 ): Promise<void> {
-  const args = [
-    "new-session",
-    "-d",
-    "-s",
-    name,
-    "-x",
-    String(cols),
-    "-y",
-    String(rows),
-  ];
+  const args = ["new-session", "-d", "-s", name, "-x", "100", "-y", "40"];
   if (opts?.cwd) args.push("-c", opts.cwd);
   await server.tmux(...args);
 

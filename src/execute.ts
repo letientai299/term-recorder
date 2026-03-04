@@ -12,10 +12,20 @@ import {
 } from "./types.ts";
 
 /**
- * Execute a single recording against a real tmux session.
+ * Execute a single recording script against a real tmux + asciinema session.
  *
- * This is the internal execution engine. Most users should use
- * `main()` + `record()` instead.
+ * This is the low-level execution engine. Most users should use
+ * {@link main} + {@link record} instead — `main()` handles CLI flags,
+ * output directories, concurrency, and error reporting.
+ *
+ * Useful when you need full control over the tmux server lifecycle or want
+ * to integrate recording into a larger pipeline.
+ *
+ * @param castFile - Path to the output `.cast` file. Parent directories are created automatically.
+ * @param opts - Recording options (terminal size, delays, mode, etc.).
+ * @param script - Script callback that queues actions on a {@link SessionApi}.
+ * @param server - Optional pre-existing {@link TmuxServer}. If omitted, a temporary server
+ *   is created and destroyed after the recording finishes.
  */
 export async function executeRecording(
   castFile: string,
@@ -29,10 +39,10 @@ export async function executeRecording(
 
   const ownsServer = !server;
   const srv =
-    server ?? new TmuxServer(`tr-${name}`, opts.userTmuxConf ?? false);
+    server ?? new TmuxServer(`tr-${name}`, opts.loadTmuxConf ?? false);
   let recording: Awaited<ReturnType<typeof startRecording>> | undefined;
   try {
-    await createSession(srv, name, opts.cols ?? 100, opts.rows ?? 30, opts);
+    await createSession(srv, name, opts);
     recording = await startRecording(srv, name, castFile, opts);
 
     // Switch to control mode for the action queue (faster than subprocess-per-command)

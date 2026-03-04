@@ -1,3 +1,4 @@
+/** Map of named keys to their terminal escape sequences. Used by {@link PaneApi.key}. */
 export const KEYS: Record<string, string> = {
   Escape: "\x1b",
   Enter: "\r",
@@ -29,8 +30,18 @@ export const KEYS: Record<string, string> = {
 };
 
 /**
- * Convert a character to its Ctrl+ equivalent.
- * ctrl("c") → \x03, ctrl("a") → \x01
+ * Produce a Ctrl+key escape sequence from a single character.
+ * Pass the result to {@link PaneApi.type} (not `typeHuman` — control sequences
+ * should be sent instantly).
+ *
+ * @example
+ * ```ts
+ * s.type(ctrl("c")); // Ctrl+C — interrupt
+ * s.type(ctrl("a")); // Ctrl+A — tmux prefix or beginning of line
+ * s.type(ctrl("l")); // Ctrl+L — clear screen
+ * ```
+ *
+ * Accepts `A`–`Z` (case-insensitive) and `@[\]^_`.
  */
 export function ctrl(char: string): string {
   if (char.length !== 1)

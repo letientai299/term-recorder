@@ -15,9 +15,9 @@ export async function sendKeys(
   if (literal && text.includes("\n")) {
     // Split on newlines — send each chunk as literal, newlines as Enter
     const parts = text.split("\n");
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i].length > 0) {
-        await server.tmux("send-keys", "-t", target, "-l", parts[i]);
+    for (const [i, part] of parts.entries()) {
+      if (part.length > 0) {
+        await server.tmux("send-keys", "-t", target, "-l", part);
       }
       if (i < parts.length - 1) {
         await server.tmux("send-keys", "-t", target, "Enter");

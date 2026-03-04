@@ -10,7 +10,7 @@ let sessionName: string;
 
 beforeEach(async () => {
   sessionName = testSessionName();
-  await createSession(server, sessionName, 80, 24);
+  await createSession(server, sessionName);
   // Wait for shell to be ready
   await Bun.sleep(500);
 });
@@ -29,7 +29,7 @@ describe("waitForText", () => {
 
   test("times out when text never appears", async () => {
     const target = `${sessionName}:0.0`;
-    await expect(
+    expect(
       waitForText(server, target, "NEVER_APPEARS_XYZ", 1000),
     ).rejects.toThrow("timed out");
   });

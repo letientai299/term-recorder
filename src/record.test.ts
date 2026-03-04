@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { executeRecording } from "./execute.ts";
-import { castCols, castContains, castHeader, castRows } from "./test-helpers.test.ts";
+import { castContains, castHeader } from "./test-helpers.test.ts";
 
 const CAST_FILE = "/tmp/test-record.cast";
 
@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe("record (e2e)", () => {
   test("produces a valid cast file", async () => {
-    await executeRecording(CAST_FILE, { cols: 80, rows: 24, idleTimeLimit: 2, mode: "headless" }, (s) => {
+    await executeRecording(CAST_FILE, { mode: "headless" }, (s) => {
       s.type("echo hello-from-record").enter();
       s.sleep(1000);
     });
@@ -19,8 +19,6 @@ describe("record (e2e)", () => {
     expect(existsSync(CAST_FILE)).toBe(true);
     const header = castHeader(CAST_FILE);
     expect(header.version).toBeGreaterThanOrEqual(2);
-    expect(castCols(header)).toBe(80);
-    expect(castRows(header)).toBe(24);
     expect(castContains(CAST_FILE, "hello-from-record")).toBe(true);
   }, 30_000);
 });

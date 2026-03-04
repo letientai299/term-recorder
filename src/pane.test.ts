@@ -9,7 +9,7 @@ let sessionName: string;
 
 beforeEach(async () => {
   sessionName = testSessionName();
-  await createSession(server, sessionName, 80, 24);
+  await createSession(server, sessionName);
 });
 
 afterEach(async () => {

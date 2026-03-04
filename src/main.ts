@@ -32,7 +32,6 @@ export function parseCliFlags(argv: string[]): CliFlags {
       "dry-run": { type: "boolean", default: false },
     },
     strict: true,
-    allowPositionals: true,
   });
 
   const parseIntOpt = (v: unknown): number | undefined => {
@@ -43,30 +42,27 @@ export function parseCliFlags(argv: string[]): CliFlags {
   };
 
   return {
-    help: values.help === true,
-    headless: values.headless === true,
+    help: values.help,
+    headless: values.headless,
     parallel: parseIntOpt(values.parallel),
     outputDir: values["output-dir"] as string | undefined,
     filter: values.filter as string | undefined,
-    loadTmuxConf: values["load-tmux-conf"] === true,
-    loadAsciinemaConf: values["load-asciinema-conf"] === true,
-    dryRun: values["dry-run"] === true,
+    loadTmuxConf: values["load-tmux-conf"],
+    loadAsciinemaConf: values["load-asciinema-conf"],
+    dryRun: values["dry-run"],
   };
 }
 
 function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
   const mode = cli.headless ? "headless" : (config.mode ?? "headful");
   return {
-    cols: config.cols,
-    rows: config.rows,
-    idleTimeLimit: config.idleTimeLimit,
     mode,
     shell: config.shell,
     typingDelay: config.typingDelay,
     actionDelay: config.actionDelay,
-    userTmuxConf: cli.loadTmuxConf || (config.userTmuxConf ?? false),
-    userAsciinemaConf:
-      cli.loadAsciinemaConf || (config.userAsciinemaConf ?? false),
+    loadTmuxConf: cli.loadTmuxConf || (config.loadTmuxConf ?? false),
+    loadAsciinemaConf:
+      cli.loadAsciinemaConf || (config.loadAsciinemaConf ?? false),
     tmux: config.tmux,
     env: config.env,
     cwd: config.cwd,
@@ -89,7 +85,7 @@ async function runOne(
   const castFile = join(outputDir, `${rec.name}.cast`);
   const server = new TmuxServer(
     `tr-${rec.name}-${Date.now()}`,
-    opts.userTmuxConf ?? false,
+    opts.loadTmuxConf ?? false,
   );
   const start = Date.now();
   try {
@@ -108,7 +104,7 @@ async function runOne(
 
 /**
  * Run recordings with a concurrency limit.
- * Simple semaphore: starts up to `limit` tasks, awaits as each finishes.
+ * Simple semaphore: starts up to `limit` tasks, awaits as each finish.
  */
 async function runWithConcurrency(
   tasks: Array<() => Promise<RecordingResult>>,
@@ -117,9 +113,8 @@ async function runWithConcurrency(
   const results = new Array<RecordingResult>(tasks.length);
   const running = new Set<Promise<void>>();
 
-  for (let i = 0; i < tasks.length; i++) {
-    const idx = i;
-    const p = tasks[idx]().then((r) => {
+  for (const [idx, task] of tasks.entries()) {
+    const p = task().then((r) => {
       results[idx] = r;
     });
     const tracked = p.then(() => {
@@ -136,8 +131,17 @@ async function runWithConcurrency(
 }
 
 /**
- * Orchestrate recording execution.
- * Parses CLI flags, merges config, and runs recordings with appropriate concurrency.
+ * Run one or more recordings, writing `.cast` files to disk.
+ *
+ * This is the main entry point for a recording script. It parses `process.argv`
+ * for CLI flags (see `--help`), merges them with the provided {@link Config},
+ * validates recording names, and executes with appropriate concurrency.
+ *
+ * Headful mode runs recordings sequentially (one visible tmux window at a time).
+ * Headless mode auto-parallelizes to `cpus / 2` unless overridden with `-p`.
+ *
+ * @param config - Shared config for all recordings.
+ * @param recordings - Array of {@link Recording} descriptors created by {@link record}.
  */
 export async function main(
   config: Config,
@@ -151,10 +155,8 @@ export async function main(
 
 Usage: bun <script> [options]
 
-Recordings:
 ${recordings.map((r) => `  ${join(outputDir, `${r.name}.cast`)}`).join("\n")}
 
-Options:
   -h, --help                Show this help message
   --headless                Run headless with auto-parallel (cpus/2)
   -p, --parallel N          Max parallel recordings
@@ -187,9 +189,7 @@ Options:
       re = new RegExp(cli.filter);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      console.error(
-        `Error: invalid --filter regex "${cli.filter}": ${reason}`,
-      );
+      console.error(`Error: invalid --filter regex "${cli.filter}": ${reason}`);
       process.exit(1);
     }
     filtered = recordings.filter((r) => re.test(r.name));
@@ -212,9 +212,7 @@ Options:
   // Determine concurrency: explicit flag > auto (cpus/2 for headless, 1 for headful)
   const concurrency =
     cli.parallel ??
-    (opts.mode === "headless"
-      ? Math.max(1, Math.floor(cpus().length / 2))
-      : 1);
+    (opts.mode === "headless" ? Math.max(1, Math.floor(cpus().length / 2)) : 1);
 
   console.log(
     `Recording ${filtered.length} cast${filtered.length > 1 ? "s" : ""} → ${outputDir} (${opts.mode}, concurrency: ${concurrency})`,

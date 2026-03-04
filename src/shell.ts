@@ -1,5 +1,6 @@
 import { $ } from "bun";
 
+/** Thrown when a tmux command exits with a non-zero status. */
 export class TmuxError extends Error {
   constructor(
     public readonly args: string[],
@@ -18,14 +19,22 @@ class StreamClosedError extends Error {
 }
 
 /**
- * An isolated tmux server instance.
+ * An isolated tmux server instance backed by a unique socket name.
  *
- * Uses tmux control mode (-C) for a persistent stdin/stdout connection,
- * avoiding a subprocess spawn per command. Falls back to subprocess for
- * commands issued before connect() or after disconnect.
+ * Each `TmuxServer` talks to its own tmux server process (`tmux -L <socketName>`),
+ * so multiple recordings can run in parallel without interfering with each other
+ * or the user's tmux sessions.
+ *
+ * After {@link connect}, commands are sent over tmux control mode (`-C`) — a
+ * persistent stdin/stdout connection that avoids subprocess spawn per command.
+ * Before `connect()` or after {@link disconnect}, commands fall back to
+ * one-shot `tmux` subprocesses.
+ *
+ * Most users don't interact with this class directly — {@link main} and
+ * {@link executeRecording} manage server lifecycle automatically.
  */
 export class TmuxServer {
-  private proc?: ReturnType<typeof Bun.spawn>;
+  private proc?: import("bun").Subprocess<"pipe", "pipe", "pipe">;
   private lineBuffer = "";
   private lines: string[] = [];
   private lineResolve?: () => void;
@@ -34,6 +43,11 @@ export class TmuxServer {
   private streamDone = false;
   private commandLock = Promise.resolve();
 
+  /**
+   * @param socketName - Unique tmux socket name (passed as `tmux -L <name>`).
+   * @param userConf - When true, load the user's `tmux.conf`. When false (default),
+   *   start with `-f /dev/null` for a clean, reproducible environment.
+   */
   constructor(
     readonly socketName: string,
     readonly userConf = false,
@@ -88,7 +102,7 @@ export class TmuxServer {
       this.streamDone = true;
       this.lineReject?.(new StreamClosedError());
     };
-    pump();
+    void pump();
   }
 
   private async nextLine(): Promise<string> {
@@ -104,7 +118,7 @@ export class TmuxServer {
     return this.lines.shift() ?? "";
   }
 
-  /** Consume the initial %begin/%end block tmux sends on attach. */
+  /** Consume the initial %begin/%end block tmux sends on attach command. */
   private async consumeInitialBlock(): Promise<void> {
     let inBlock = false;
     while (true) {
@@ -136,13 +150,18 @@ export class TmuxServer {
   }
 
   /** Send a command via control mode and await its response. Serialized via mutex. */
-  private controlCommand(...args: string[]): Promise<string> {
-    let release: () => void;
+  private async controlCommand(...args: string[]): Promise<string> {
+    let release!: () => void;
     const prev = this.commandLock;
     this.commandLock = new Promise((r) => {
       release = r;
     });
-    return prev.then(() => this.controlCommandInner(...args)).finally(() => release!());
+    try {
+      await prev;
+      return await this.controlCommandInner(...args);
+    } finally {
+      release();
+    }
   }
 
   private async controlCommandInner(...args: string[]): Promise<string> {
@@ -171,7 +190,12 @@ export class TmuxServer {
     }
   }
 
-  /** Execute a tmux command. Uses control mode if connected, subprocess otherwise. */
+  /**
+   * Execute a tmux command and return its stdout.
+   * Routes through control mode when connected, subprocess otherwise.
+   * @param args - tmux sub-command and arguments (e.g. `"send-keys"`, `"-t"`, `"myPane"`, `"-l"`, `"hello"`).
+   * @throws {TmuxError} if the command exits non-zero.
+   */
   async tmux(...args: string[]): Promise<string> {
     if (this.connected) {
       return this.controlCommand(...args);

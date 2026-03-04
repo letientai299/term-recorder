@@ -15,25 +15,25 @@ export interface RecordingHandle {
   headfulProc?: ReturnType<typeof Bun.spawn>;
   /** Temp dir for asciinema config isolation — cleaned up on stop. */
   ascConfigDir?: string;
-  /** Absolute path to the cast file — used to poll for write completion. */
+  /** Absolute path to the cast file — used to poll for writing completion. */
   castFile?: string;
 }
 
 /**
  * Build the environment for the asciinema process.
  * By default, points ASCIINEMA_CONFIG_HOME to an empty temp dir
- * so user's asciinema config doesn't interfere.
+ * so the user's asciinema config doesn't interfere.
  */
-function asciinemaEnv(userAsciinemaConf: boolean): {
+function asciinemaEnv(loadConf: boolean): {
   env: Record<string, string>;
   dir?: string;
 } {
-  if (userAsciinemaConf) return { env: {} };
+  if (loadConf) return { env: {} };
   const dir = mkdtempSync(join(tmpdir(), "tr-asc-"));
   return { env: { ASCIINEMA_CONFIG_HOME: dir }, dir };
 }
 
-/** Poll until pane has non-empty content, or throw after timeout. */
+/** Poll until the pane has non-empty content, or throw after timeout. */
 async function waitForPaneContent(
   server: TmuxServer,
   target: string,
@@ -59,14 +59,11 @@ export async function startRecording(
   server: TmuxServer,
   mainSession: string,
   castFile: string,
-  opts?: Pick<
-    RecordOptions,
-    "idleTimeLimit" | "cols" | "rows" | "mode" | "userAsciinemaConf"
-  >,
+  opts?: Pick<RecordOptions, "mode" | "loadAsciinemaConf">,
 ): Promise<RecordingHandle> {
   const mode = opts?.mode ?? "headful";
   const absCast = resolve(castFile);
-  const asc = asciinemaEnv(opts?.userAsciinemaConf ?? false);
+  const asc = asciinemaEnv(opts?.loadAsciinemaConf ?? false);
 
   // Build the tmux attach command with the isolated socket
   const tmuxFlags = `${server.userConf ? "" : "-f /dev/null "}`;
@@ -74,9 +71,6 @@ export async function startRecording(
 
   // Build asciinema command
   let cmd = "asciinema rec --overwrite";
-  if (opts?.idleTimeLimit != null) {
-    cmd += ` --idle-time-limit ${opts.idleTimeLimit}`;
-  }
   cmd += ` -c "${attachCmd}" ${absCast}`;
 
   if (mode === "headful") {
@@ -96,10 +90,8 @@ export async function startRecording(
 
   // Headless: run in a detached tmux capture session
   const captureName = captureSessionName(mainSession);
-  const cols = opts?.cols ?? 100;
-  const rows = opts?.rows ?? 30;
 
-  await createSession(server, captureName, cols, rows);
+  await createSession(server, captureName);
 
   // Set asciinema env vars via tmux set-environment (no shell eval)
   for (const [key, value] of Object.entries(asc.env)) {
@@ -108,12 +100,7 @@ export async function startRecording(
   // Respawn the pane so it inherits the new environment
   await server.tmux("respawn-pane", "-t", `${captureName}:0.0`, "-k");
   // 14b: Poll for shell prompt instead of fixed 300ms sleep
-  await waitForPaneContent(
-    server,
-    `${captureName}:0.0`,
-    5_000,
-    "respawn-pane",
-  );
+  await waitForPaneContent(server, `${captureName}:0.0`, 5_000, "respawn-pane");
 
   await sendKeys(server, `${captureName}:0.0`, cmd);
   await sendKeys(server, `${captureName}:0.0`, "\r", false);

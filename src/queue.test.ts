@@ -93,7 +93,7 @@ describe("createSessionProxy", () => {
       (typeof queue.actions)[0],
       { kind: "type" }
     >;
-    expect(typeAction.pane).toBe(split.placeholder);
+    expect(typeAction.pane).toBe(split.placeholder as string);
     expect(typeAction.text).toBe("in pane 2");
   });
 });

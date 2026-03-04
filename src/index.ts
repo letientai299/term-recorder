@@ -1,13 +1,20 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { ActionQueue, createSessionProxy } from "./queue.ts";
+import { ActionQueue, type QueueConfig, createSessionProxy } from "./queue.ts";
 import { startRecording, stopRecording } from "./recorder.ts";
 import { createSession, killSession } from "./session.ts";
 import { initServer, resetServer } from "./shell.ts";
-import type { PaneApi, RecordOptions, SessionApi } from "./types.ts";
+import {
+  DEFAULT_ACTION_DELAY_MS,
+  DEFAULT_TYPING_DELAY_MS,
+  type PaneApi,
+  type RecordOptions,
+  type SessionApi,
+} from "./types.ts";
 
 export type { PaneApi, RecordOptions, SessionApi };
 export { ctrl } from "./keys.ts";
+export { DEFAULT_ACTION_DELAY_MS, DEFAULT_TYPING_DELAY_MS } from "./types.ts";
 
 /**
  * Record a terminal demo to an asciicast file.
@@ -31,7 +38,12 @@ export async function record(
     const recording = await startRecording(name, castFile, opts);
     headfulProc = recording.headfulProc;
 
-    const queue = new ActionQueue(name);
+    const queueCfg: QueueConfig = {
+      typingDelay: Math.max(0, opts.typingDelay ?? DEFAULT_TYPING_DELAY_MS),
+      actionDelay: Math.max(0, opts.actionDelay ?? DEFAULT_ACTION_DELAY_MS),
+      headless: (opts.mode ?? "headful") === "headless",
+    };
+    const queue = new ActionQueue(name, queueCfg);
     const session = createSessionProxy(queue, name);
     const result = script(session);
     if (result && typeof result.then === "function") {

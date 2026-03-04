@@ -5,7 +5,7 @@ export async function createSession(
   name: string,
   cols: number,
   rows: number,
-  opts?: Pick<RecordOptions, "env" | "cwd" | "tmux">,
+  opts?: Pick<RecordOptions, "env" | "cwd" | "tmux" | "shell">,
 ): Promise<void> {
   const args = [
     "new-session",
@@ -19,6 +19,11 @@ export async function createSession(
   ];
   if (opts?.cwd) args.push("-c", opts.cwd);
   await tmux(...args);
+
+  // Set default shell for new panes
+  if (opts?.shell) {
+    await tmux("set-option", "-t", name, "default-shell", opts.shell);
+  }
 
   // Force 0-based indexing for predictable pane targeting
   await tmux("set-option", "-t", name, "base-index", "0");

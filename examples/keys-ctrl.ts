@@ -8,32 +8,18 @@ await record(
   "bin/demo-keys.cast",
   { cols: 100, rows: 30, idleTimeLimit: 2 },
   (s) => {
-    s.sleep(500);
-
     // Type some commands to build history
     s.typeHuman("echo 'first command'").enter();
-    s.sleep(500);
     s.typeHuman("echo 'second command'").enter();
-    s.sleep(500);
 
     // Use arrow keys to navigate history
-    s.key("Up");
-    s.sleep(400);
-    s.key("Up");
-    s.sleep(400);
-    s.key("Down");
-    s.sleep(400);
-    s.enter();
-    s.sleep(500);
+    s.key("Up").key("Up").key("Down").enter();
 
     // Type something then cancel with Ctrl+C
     s.typeHuman("this-will-be-cancelled");
-    s.sleep(600);
     s.type(ctrl("c"));
-    s.sleep(500);
 
     s.typeHuman("echo 'Ctrl+C worked, back to clean prompt'").enter();
-    s.sleep(1000);
   },
 );
 

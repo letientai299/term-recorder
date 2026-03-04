@@ -1,9 +1,21 @@
+/** 120 WPM × 5 chars/word ÷ 60s = 10 chars/s → 100ms per char */
+export const DEFAULT_TYPING_DELAY_MS = 100;
+
+/** Auto-pause between actions (ms). 0 = no pause. */
+export const DEFAULT_ACTION_DELAY_MS = 300;
+
 export interface RecordOptions {
   cols?: number;
   rows?: number;
   idleTimeLimit?: number;
-  /** "headful" (default) shows tmux in a terminal; "headless" runs detached. */
+  /** "headful" (default) shows tmux in a terminal; "headless" runs detached with logs. */
   mode?: "headful" | "headless";
+  /** Shell to launch inside tmux panes. Default: inherited from $SHELL. */
+  shell?: string;
+  /** Per-char delay for typeHuman() in ms. Default: 100 (120 WPM). */
+  typingDelay?: number;
+  /** Auto-pause between actions in ms. Negative values become 0. Default: 300. */
+  actionDelay?: number;
   /** Load user's tmux.conf. Default: false (clean tmux with no user config). */
   userTmuxConf?: boolean;
   /** Load user's asciinema config. Default: false (clean asciinema config). */

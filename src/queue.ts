@@ -1,13 +1,32 @@
 import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
-import type { Action, PaneApi, SessionApi } from "./types.ts";
+import {
+  DEFAULT_ACTION_DELAY_MS,
+  DEFAULT_TYPING_DELAY_MS,
+  type Action,
+  type PaneApi,
+  type SessionApi,
+} from "./types.ts";
 import { exec, waitForPrompt, waitForText } from "./wait.ts";
+
+export interface QueueConfig {
+  typingDelay: number;
+  actionDelay: number;
+  headless: boolean;
+}
+
+function log(cfg: QueueConfig, msg: string): void {
+  if (cfg.headless) console.log(`[rec] ${msg}`);
+}
 
 export class ActionQueue {
   /** @internal */ actions: Action[] = [];
   /** @internal */ paneCount = 0;
 
-  constructor(private sessionName: string) {}
+  constructor(
+    private sessionName: string,
+    private cfg: QueueConfig,
+  ) {}
 
   push(action: Action): void {
     this.actions.push(action);
@@ -18,63 +37,74 @@ export class ActionQueue {
       const action = this.actions.shift();
       if (!action) break;
       await this.execute(action);
+      // Auto-pause between actions (skip for sleep — already a pause)
+      if (action.kind !== "sleep" && this.cfg.actionDelay > 0) {
+        await Bun.sleep(this.cfg.actionDelay);
+      }
     }
   }
 
   private async execute(action: Action): Promise<void> {
     switch (action.kind) {
       case "type":
+        log(this.cfg, `type "${action.text}" → ${action.pane}`);
         await sendKeys(action.pane, action.text);
         break;
       case "typeHuman": {
-        const delay = action.delayMs ?? 80;
+        const delay = action.delayMs ?? this.cfg.typingDelay;
+        log(this.cfg, `typeHuman "${action.text}" (${delay}ms/char) → ${action.pane}`);
         for (const char of action.text) {
           await sendKeys(action.pane, char);
-          // Jitter ±40% for natural feel
           const jitter = delay * (0.6 + Math.random() * 0.8);
           await Bun.sleep(jitter);
         }
         break;
       }
       case "key":
+        log(this.cfg, `key ${action.name} → ${action.pane}`);
         await sendKey(action.pane, action.name);
         break;
       case "enter":
+        log(this.cfg, `enter → ${action.pane}`);
         await sendKeys(action.pane, "\r", false);
         break;
       case "exec":
+        log(this.cfg, `exec "${action.cmd}" → ${action.pane}`);
         await exec(action.pane, action.cmd, action.timeout);
+        log(this.cfg, `exec done`);
         break;
       case "sleep":
+        log(this.cfg, `sleep ${action.ms}ms`);
         await Bun.sleep(action.ms);
         break;
       case "waitForText":
+        log(this.cfg, `waitForText "${action.text}" → ${action.pane}`);
         await waitForText(action.pane, action.text, action.timeout);
+        log(this.cfg, `waitForText found`);
         break;
       case "waitForPrompt":
+        log(this.cfg, `waitForPrompt "${action.prompt}" → ${action.pane}`);
         await waitForPrompt(action.pane, action.prompt, action.timeout);
+        log(this.cfg, `waitForPrompt found`);
         break;
       case "splitH": {
-        const paneId = await splitPane(action.session, "h", action.percent);
+        log(this.cfg, `splitH ${action.percent ?? ""}% → ${action.session}`);
+        await splitPane(action.session, "h", action.percent);
         this.paneCount++;
-        // Store the pane ID for the proxy that triggered this
         this._lastSplitPaneTarget = `${this.sessionName}:0.${this.paneCount}`;
-        this._lastSplitPaneId = paneId;
         break;
       }
       case "splitV": {
-        const paneId = await splitPane(action.session, "v", action.percent);
+        log(this.cfg, `splitV ${action.percent ?? ""}% → ${action.session}`);
+        await splitPane(action.session, "v", action.percent);
         this.paneCount++;
         this._lastSplitPaneTarget = `${this.sessionName}:0.${this.paneCount}`;
-        this._lastSplitPaneId = paneId;
         break;
       }
     }
   }
 
-  // Used by split operations to pass pane info back
   _lastSplitPaneTarget = "";
-  _lastSplitPaneId = "";
 }
 
 export function createPaneProxy(queue: ActionQueue, target: string): PaneApi {
@@ -130,10 +160,6 @@ export function createSessionProxy(
     },
     splitH(percent?: number): PaneApi {
       queue.push({ kind: "splitH", session: sessionName, percent });
-      // We need to return a pane proxy for the new pane.
-      // Since splits execute during drain(), we predict the next pane index.
-      const _nextIndex = queue.paneCount + 1;
-      // Count pending split actions to predict the pane index at drain time
       const pendingSplits = queue.actions.filter(
         (a) => a.kind === "splitH" || a.kind === "splitV",
       ).length;

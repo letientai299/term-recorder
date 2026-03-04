@@ -1,2 +1,14 @@
 [tools]
 bun = "latest"
+
+[tasks.lint]
+run = "bunx biome check --write ."
+description = "Lint and auto-fix"
+
+[tasks.fmt]
+run = "bunx prettier --write ."
+description = "Format code and docs with Prettier"
+
+[tasks.examples]
+run = "for f in examples/*.ts; do echo \"==> $f\"; bun \"$f\"; done"
+description = "Run all example demo scripts"

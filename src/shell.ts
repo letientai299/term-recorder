@@ -11,10 +11,16 @@ export class TmuxError extends Error {
   }
 }
 
+class StreamClosedError extends Error {
+  constructor() {
+    super("Control mode stream closed");
+  }
+}
+
 /**
  * An isolated tmux server instance.
  *
- * Uses tmux control mode (-CC) for a persistent stdin/stdout connection,
+ * Uses tmux control mode (-C) for a persistent stdin/stdout connection,
  * avoiding a subprocess spawn per command. Falls back to subprocess for
  * commands issued before connect() or after disconnect.
  */
@@ -23,7 +29,9 @@ export class TmuxServer {
   private lineBuffer = "";
   private lines: string[] = [];
   private lineResolve?: () => void;
+  private lineReject?: (err: Error) => void;
   private connected = false;
+  private streamDone = false;
 
   constructor(
     readonly socketName: string,
@@ -47,6 +55,7 @@ export class TmuxServer {
       stdout: "pipe",
       stderr: "pipe",
     });
+    this.streamDone = false;
     this.startReading();
     this.connected = true;
     // Consume the initial %begin/%end block tmux sends on connect
@@ -72,18 +81,25 @@ export class TmuxServer {
           }
         }
       } catch {
-        // Stream closed
+        // Stream closed or errored
       }
+      // Signal any pending nextLine() that the stream is done
+      this.streamDone = true;
+      this.lineReject?.(new StreamClosedError());
     };
     pump();
   }
 
   private async nextLine(): Promise<string> {
-    while (this.lines.length === 0) {
-      await new Promise<void>((resolve) => {
-        this.lineResolve = resolve;
-      });
+    if (this.lines.length > 0) {
+      return this.lines.shift() ?? "";
     }
+    if (this.streamDone) throw new StreamClosedError();
+    await new Promise<void>((resolve, reject) => {
+      this.lineResolve = resolve;
+      this.lineReject = reject;
+    });
+    if (this.lines.length === 0) throw new StreamClosedError();
     return this.lines.shift() ?? "";
   }
 
@@ -103,9 +119,24 @@ export class TmuxServer {
     }
   }
 
+  /**
+   * Quote an argument for tmux control mode command parsing.
+   * Args containing spaces, special chars, or tmux format sequences
+   * must be wrapped in single quotes with internal quotes escaped.
+   */
+  private quoteCcArg(arg: string): string {
+    // Empty string needs quoting
+    if (arg.length === 0) return "''";
+    // If it contains characters that need quoting, wrap in single quotes
+    if (/[\s"'\\#{}$;~]/.test(arg) || arg.startsWith("-")) {
+      return `'${arg.replace(/'/g, "'\\''")}'`;
+    }
+    return arg;
+  }
+
   /** Send a command via control mode and await its response. */
   private async controlCommand(...args: string[]): Promise<string> {
-    const cmd = args.join(" ");
+    const cmd = args.map((a) => this.quoteCcArg(a)).join(" ");
     this.proc?.stdin.write(`${cmd}\n`);
 
     // Read lines until we find %begin, then collect until %end or %error
@@ -158,14 +189,25 @@ export class TmuxServer {
   async disconnect(): Promise<void> {
     if (!this.connected || !this.proc) return;
     this.connected = false;
-    try {
-      this.proc.stdin.write("\n");
-      this.proc.stdin.end();
-      await this.proc.exited;
-    } catch {
-      // Process may already be dead
-    }
+    const proc = this.proc;
     this.proc = undefined;
+
+    try {
+      proc.stdin.write("\n"); // detach
+      proc.stdin.end();
+    } catch {
+      // stdin may already be closed
+    }
+
+    // Wait for process exit with a timeout, then force kill
+    const exited = proc.exited;
+    const timeout = new Promise<"timeout">((r) =>
+      setTimeout(() => r("timeout"), 2000),
+    );
+    if ((await Promise.race([exited, timeout])) === "timeout") {
+      proc.kill();
+      await proc.exited;
+    }
   }
 
   /** Kill the tmux server and clean up the socket. */

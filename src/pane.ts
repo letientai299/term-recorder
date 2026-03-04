@@ -3,6 +3,8 @@ import type { TmuxServer } from "./shell.ts";
 
 /**
  * Send literal text to a tmux pane. Uses -l to prevent key interpretation.
+ * Newlines are sent as Enter keys since they can't be embedded in a single
+ * tmux control mode command line.
  */
 export async function sendKeys(
   server: TmuxServer,
@@ -10,6 +12,19 @@ export async function sendKeys(
   text: string,
   literal = true,
 ): Promise<void> {
+  if (literal && text.includes("\n")) {
+    // Split on newlines — send each chunk as literal, newlines as Enter
+    const parts = text.split("\n");
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].length > 0) {
+        await server.tmux("send-keys", "-t", target, "-l", parts[i]);
+      }
+      if (i < parts.length - 1) {
+        await server.tmux("send-keys", "-t", target, "Enter");
+      }
+    }
+    return;
+  }
   const args = ["send-keys", "-t", target];
   if (literal) args.push("-l");
   args.push(text);

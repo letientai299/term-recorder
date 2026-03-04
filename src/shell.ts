@@ -69,16 +69,36 @@ class LineReader {
 
 /**
  * Quote an argument for tmux control mode command parsing.
- * Args containing spaces, special chars, or tmux format sequences
- * must be wrapped in single quotes with internal quotes escaped.
+ *
+ * Uses `{braces}` quoting (tmux 2.0+) which passes content verbatim.
+ * Falls back to single-quote escaping for args containing `#{` format
+ * sequences (braces suppress expansion) or unbalanced braces.
  */
 /** @internal */
 export function quoteCcArg(arg: string): string {
   if (arg.length === 0) return "''";
-  if (/[\s"'\\#{}$;~]/.test(arg) || arg.startsWith("-")) {
-    return `'${arg.replace(/'/g, "'\\''")}'`;
-  }
-  return arg;
+
+  // Flags starting with - must use single-quote escaping; tmux treats
+  // {-flag} as a command block, not a quoted argument.
+  if (arg.startsWith("-")) return `'${arg.replace(/'/g, "'\\''")}'`;
+
+  const needsQuoting = /[\s"'\\#{}$;~]/.test(arg);
+  if (!needsQuoting) return arg;
+
+  // Format sequences like #{pane_id} must expand — braces suppress that.
+  // Args with whitespace can't use braces — tmux tokenizes on spaces first.
+  // Semicolons can't use braces — tmux parses {;} as a command block.
+  const hasFormat = arg.includes("#{");
+  const canBrace = !hasFormat && !/[\s;]/.test(arg);
+  // Unbalanced braces can't use {braces} quoting
+  const balanced =
+    canBrace &&
+    arg.split("").reduce((d, c) => (c === "{" ? d + 1 : c === "}" ? d - 1 : d), 0) === 0;
+
+  if (canBrace && balanced) return `{${arg}}`;
+
+  // Single-quote escape fallback
+  return `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
 /**
@@ -101,6 +121,9 @@ export class TmuxServer {
   private reader?: LineReader;
   private connected = false;
   private commandLock = Promise.resolve();
+
+  /** Callbacks keyed by subscription name, invoked on %subscription-changed. */
+  private subscriptions = new Map<string, Array<(value: string) => void>>();
 
   /**
    * @param socketName - Unique tmux socket name (passed as `tmux -L <name>`).
@@ -177,6 +200,19 @@ export class TmuxServer {
     let inBlock = false;
     while (true) {
       const line = await this.nextLine();
+      if (!inBlock && line.startsWith("%subscription-changed ")) {
+        // Format: %subscription-changed <name> <item> : <value>
+        const rest = line.slice("%subscription-changed ".length);
+        const spaceIdx = rest.indexOf(" ");
+        if (spaceIdx >= 0) {
+          const name = rest.slice(0, spaceIdx);
+          const colonIdx = rest.indexOf(" : ", spaceIdx);
+          const value = colonIdx >= 0 ? rest.slice(colonIdx + 3) : "";
+          const cbs = this.subscriptions.get(name);
+          if (cbs) for (const cb of [...cbs]) cb(value);
+        }
+        continue;
+      }
       if (!inBlock && line.startsWith("%begin ")) {
         inBlock = true;
         continue;
@@ -220,6 +256,67 @@ export class TmuxServer {
       );
     }
     return result.stdout.toString().trim();
+  }
+
+  /**
+   * Register a `refresh-client -B` subscription (tmux 3.1+).
+   * The server will push `%subscription-changed` notifications when the
+   * format value changes.
+   */
+  async subscribe(
+    name: string,
+    target: string,
+    format: string,
+  ): Promise<void> {
+    if (!this.subscriptions.has(name)) this.subscriptions.set(name, []);
+    await this.tmux("refresh-client", "-B", `${name}:${target}:${format}`);
+  }
+
+  /** Remove a subscription and discard its callbacks. */
+  async unsubscribe(name: string): Promise<void> {
+    this.subscriptions.delete(name);
+    await this.tmux("refresh-client", "-B", `${name}:`);
+  }
+
+  /**
+   * Returns a promise that resolves when a subscription notification
+   * matches `predicate`, or rejects on timeout.
+   */
+  waitForSubscription(
+    name: string,
+    predicate: (value: string) => boolean,
+    timeout: number,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(
+          new Error(
+            `waitForSubscription("${name}") timed out after ${timeout}ms`,
+          ),
+        );
+      }, timeout);
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        const cbs = this.subscriptions.get(name);
+        if (cbs) {
+          const idx = cbs.indexOf(cb);
+          if (idx >= 0) cbs.splice(idx, 1);
+        }
+      };
+
+      const cb = (value: string) => {
+        if (predicate(value)) {
+          cleanup();
+          resolve();
+        }
+      };
+
+      const arr = this.subscriptions.get(name) ?? [];
+      arr.push(cb);
+      this.subscriptions.set(name, arr);
+    });
   }
 
   /** Detach from control mode. */

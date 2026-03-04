@@ -68,8 +68,11 @@ export async function waitForPrompt(
   );
 }
 
+let subscriptionCounter = 0;
+
 /**
- * Poll until the pane title contains `title`.
+ * Wait until the pane title contains `title`, using tmux 3.1+
+ * `refresh-client -B` subscriptions for push-based notification.
  */
 export async function waitForTitle(
   server: TmuxServer,
@@ -77,15 +80,26 @@ export async function waitForTitle(
   title: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<void> {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const current = await getPaneTitle(server, target);
-    if (current.includes(title)) return;
-    await Bun.sleep(POLL_INTERVAL);
+  const name = `tr-title-${process.pid}-${++subscriptionCounter}`;
+
+  // Check current title first — may already match
+  const current = await getPaneTitle(server, target);
+  if (current.includes(title)) return;
+
+  await server.subscribe(name, target, "#{pane_title}");
+  try {
+    await server.waitForSubscription(
+      name,
+      (v) => v.includes(title),
+      timeout,
+    );
+  } catch (err) {
+    throw new Error(
+      `waitForTitle("${title}") timed out after ${timeout}ms on ${target}`,
+    );
+  } finally {
+    await server.unsubscribe(name);
   }
-  throw new Error(
-    `waitForTitle("${title}") timed out after ${timeout}ms on ${target}`,
-  );
 }
 
 /**

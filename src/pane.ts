@@ -55,7 +55,7 @@ export async function capturePane(
   server: TmuxServer,
   target: string,
 ): Promise<string> {
-  return server.tmux("capture-pane", "-t", target, "-p", "-S", "-");
+  return server.tmux("capture-pane", "-t", target, "-p", "-T", "-S", "-");
 }
 
 /**

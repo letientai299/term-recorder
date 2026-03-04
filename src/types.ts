@@ -126,6 +126,12 @@ export interface Pane {
    * @param timeout - Max wait time in ms. Default: 5 000.
    */
   waitForTitle(title: string, timeout?: number): Pane;
+  /** Type text and press Enter. Shorthand for `.type(text).enter()`. */
+  run(text: string): Pane;
+  /** Type text, press Enter, then wait for the detected prompt to reappear. Requires a prior `detectPrompt()`. */
+  reply(text: string, timeout?: number): Pane;
+  /** Pause for a fixed duration. Like {@link sleep} but defaults to 1 000 ms. */
+  pause(ms?: number): Pane;
 }
 
 /**
@@ -134,6 +140,9 @@ export interface Pane {
  */
 export interface Session extends Pane {
   sleep(ms: number): Session;
+  run(text: string): Session;
+  reply(text: string, timeout?: number): Session;
+  pause(ms?: number): Session;
   /**
    * Split the session horizontally (side by side). Returns a {@link Pane}
    * targeting the new right pane.

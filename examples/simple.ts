@@ -3,47 +3,47 @@ import { ctrl, defineConfig, main, record } from "../src";
 const config = defineConfig({});
 
 const hello = record("hello", (s) => {
-  s.type("echo 'Hello from term-recorder!'").enter();
-  s.type("ls -la").enter();
-  s.type("echo 'Demo complete.'").enter();
+  s.run("echo 'Hello from term-recorder!'");
+  s.run("ls -la");
+  s.run("echo 'Demo complete.'");
 });
 
 const split = record("split", (s) => {
-  s.type("echo 'Left pane'").enter();
+  s.run("echo 'Left pane'");
   const right = s.splitH(50);
-  right.type("echo 'Right pane'").enter();
-  s.type("echo 'Both panes visible!'").enter();
-  right.type("ls").enter();
+  right.run("echo 'Right pane'");
+  s.run("echo 'Both panes visible!'");
+  right.run("ls");
 });
 
 const exec = record("exec-wait", (s) => {
-  s.type("echo 'Running a slow command...'").enter();
+  s.run("echo 'Running a slow command...'");
   s.exec("sleep 2 && echo 'DONE: slow command finished'");
-  s.type("echo 'Now using waitForText...'").enter();
-  s.type("(sleep 1 && echo MARKER_READY) &").enter();
+  s.run("echo 'Now using waitForText...'");
+  s.run("(sleep 1 && echo MARKER_READY) &");
   s.waitForText("MARKER_READY", 5000);
-  s.type("echo 'Detected MARKER_READY — continuing.'").enter();
+  s.run("echo 'Detected MARKER_READY — continuing.'");
 });
 
 const keys = record("keys-ctrl", (s) => {
-  s.type("echo 'first command'").enter();
-  s.type("echo 'second command'").enter();
+  s.run("echo 'first command'");
+  s.run("echo 'second command'");
   s.key("Up").key("Up").key("Down").enter();
   s.type("this-will-be-cancelled");
   s.send(ctrl("c"));
-  s.type("echo 'Ctrl+C worked, back to clean prompt'").enter();
+  s.run("echo 'Ctrl+C worked, back to clean prompt'");
 });
 
 const topBottom = record("top-bottom", (s) => {
-  s.type(
+  s.run(
     "cat > hello.sh << 'EOF'\n#!/bin/bash\necho \"Hello from term-recorder!\"\nEOF",
-  ).enter();
-  s.type("chmod +x hello.sh").enter();
+  );
+  s.run("chmod +x hello.sh");
   const bottom = s.splitV(40);
-  bottom.type("./hello.sh").enter();
-  s.type("cat hello.sh").enter();
-  bottom.type("rm hello.sh").enter();
-  s.type("echo 'Demo complete.'").enter();
+  bottom.run("./hello.sh");
+  s.run("cat hello.sh");
+  bottom.run("rm hello.sh");
+  s.run("echo 'Demo complete.'");
 });
 
 await main(config, [hello, split, exec, keys, topBottom]);

@@ -188,6 +188,21 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "waitForTitle", pane: target, title, timeout });
       return api;
     },
+    run(text: string) {
+      queue.push({ kind: "type", pane: target, text });
+      queue.push({ kind: "enter", pane: target });
+      return api;
+    },
+    reply(text: string, timeout?: number) {
+      queue.push({ kind: "type", pane: target, text });
+      queue.push({ kind: "enter", pane: target });
+      queue.push({ kind: "waitForPrompt", pane: target, timeout });
+      return api;
+    },
+    pause(ms?: number) {
+      queue.push({ kind: "sleep", ms: ms ?? 1000 });
+      return api;
+    },
   };
   return api;
 }
@@ -209,6 +224,21 @@ export function createSessionProxy(
     ...pane,
     sleep(ms: number) {
       queue.push({ kind: "sleep", ms });
+      return api;
+    },
+    run(text: string) {
+      queue.push({ kind: "type", pane: defaultTarget, text });
+      queue.push({ kind: "enter", pane: defaultTarget });
+      return api;
+    },
+    reply(text: string, timeout?: number) {
+      queue.push({ kind: "type", pane: defaultTarget, text });
+      queue.push({ kind: "enter", pane: defaultTarget });
+      queue.push({ kind: "waitForPrompt", pane: defaultTarget, timeout });
+      return api;
+    },
+    pause(ms?: number) {
+      queue.push({ kind: "sleep", ms: ms ?? 1000 });
       return api;
     },
     splitH: (percent?: number) => split("splitH", percent),

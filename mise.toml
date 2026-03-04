@@ -2,7 +2,16 @@
 bun = "latest"
 
 [tasks.test]
+run = "bun test -- src/*.test.ts"
+description = "Unit tests only"
+
+[tasks.e2e]
+run = "bun test -- src/*.spec.ts"
+description = "End-to-end tests (requires tmux)"
+
+[tasks."test:all"]
 run = "bun test"
+description = "All tests (unit + e2e)"
 
 [tasks.lint]
 run = ["bun tsc --noEmit", "bunx biome check --write --unsafe ."]

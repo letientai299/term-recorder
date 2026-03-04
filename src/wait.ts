@@ -2,7 +2,7 @@ import { capturePane } from "./pane.ts";
 import type { TmuxServer } from "./shell.ts";
 
 const DEFAULT_TIMEOUT = 10_000;
-const POLL_INTERVAL = 200;
+const POLL_INTERVAL = 100;
 
 /**
  * Generic pane poller — captures pane content until `predicate` returns true.

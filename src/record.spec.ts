@@ -13,7 +13,7 @@ describe("record (e2e)", () => {
   test("produces a valid cast file", async () => {
     await executeRecording(CAST_FILE, { mode: "headless" }, (s) => {
       s.type("echo hello-from-record").enter();
-      s.sleep(1000);
+      s.sleep(500);
     });
 
     expect(existsSync(CAST_FILE)).toBe(true);

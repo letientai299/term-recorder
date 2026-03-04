@@ -98,7 +98,7 @@ export function quoteCcArg(arg: string): string {
   // Args with whitespace can't use braces — tmux tokenizes on spaces first.
   // Semicolons can't use braces — tmux parses {;} as a command block.
   const hasFormat = arg.includes("#{");
-  const canBrace = !hasFormat && !/[\s;]/.test(arg);
+  const canBrace = !hasFormat && !/[\s;']/.test(arg);
   // Unbalanced braces can't use {braces} quoting
   const balanced =
     canBrace &&
@@ -178,12 +178,16 @@ export class TmuxServer {
       "-t",
       sessionName,
     ];
-    const cp = nodeSpawn(args[0]!, args.slice(1), {
+    const cmd = args[0] as string;
+    const cp = nodeSpawn(cmd, args.slice(1), {
       stdio: ["pipe", "pipe", "pipe"],
     });
+    if (!cp.stdin || !cp.stdout) {
+      throw new Error("Failed to open stdio pipes for tmux process");
+    }
     this.proc = {
-      stdin: cp.stdin!,
-      stdout: Readable.toWeb(cp.stdout!) as ReadableStream<Uint8Array>,
+      stdin: cp.stdin,
+      stdout: Readable.toWeb(cp.stdout) as ReadableStream<Uint8Array>,
       exited: new Promise<number>((r) =>
         cp.on("exit", (code) => r(code ?? 1)),
       ),
@@ -329,7 +333,9 @@ export class TmuxServer {
       nodeExecFile("tmux", fullArgs, (err, stdout, stderr) => {
         if (err) {
           const exitCode =
-            typeof err.code === "number" ? err.code : (err as any).status ?? 1;
+            typeof err.code === "number"
+              ? err.code
+              : (err as unknown as { status?: number }).status ?? 1;
           reject(new TmuxError(fullArgs, exitCode, stderr.trim()));
         } else {
           resolve(stdout.trim());

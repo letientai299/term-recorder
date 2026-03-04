@@ -14,22 +14,21 @@ describe("record (lazy)", () => {
     expect(called).toBe(false);
   });
 
-  test("accepts valid names", () => {
-    for (const name of ["basic", "my-demo", "v1.0", "group/sub", "a_b"]) {
+  test.each(["basic", "my-demo", "v1.0", "group/sub", "a_b"])(
+    "accepts valid name %s",
+    (name) => {
       expect(() => record(name, noop)).not.toThrow();
-    }
-  });
+    },
+  );
 
-  test("rejects names with shell metacharacters", () => {
-    for (const name of [
-      "foo$(whoami)",
-      "foo; rm -rf /",
-      'foo"bar',
-      "foo bar",
-      "foo`id`",
-    ]) {
-      expect(() => record(name, noop)).toThrow("Invalid recording name");
-    }
+  test.each([
+    "foo$(whoami)",
+    "foo; rm -rf /",
+    'foo"bar',
+    "foo bar",
+    "foo`id`",
+  ])("rejects shell metacharacter name %s", (name) => {
+    expect(() => record(name, noop)).toThrow("Invalid recording name");
   });
 
   test("rejects path traversal", () => {

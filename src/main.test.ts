@@ -14,30 +14,20 @@ describe("parseCliFlags", () => {
     expect(flags.dryRun).toBe(false);
   });
 
-  test("--help / -h", () => {
-    expect(parseCliFlags(["--help"]).help).toBe(true);
-    expect(parseCliFlags(["-h"]).help).toBe(true);
-  });
-
-  test("--headless", () => {
-    expect(parseCliFlags(["--headless"]).headless).toBe(true);
-  });
-
-  test("-p / --parallel", () => {
-    expect(parseCliFlags(["-p", "4"]).parallel).toBe(4);
-    expect(parseCliFlags(["--parallel", "2"]).parallel).toBe(2);
-  });
-
-  test("-o / --output-dir", () => {
-    expect(parseCliFlags(["-o", "./out"]).outputDir).toBe("./out");
-    expect(parseCliFlags(["--output-dir", "/tmp/casts"]).outputDir).toBe(
-      "/tmp/casts",
-    );
-  });
-
-  test("-f / --filter", () => {
-    expect(parseCliFlags(["-f", "basic"]).filter).toBe("basic");
-    expect(parseCliFlags(["--filter", "^demo"]).filter).toBe("^demo");
+  test.each([
+    [["--help"], "help", true],
+    [["-h"], "help", true],
+    [["--headless"], "headless", true],
+    [["-p", "4"], "parallel", 4],
+    [["--parallel", "2"], "parallel", 2],
+    [["-o", "./out"], "outputDir", "./out"],
+    [["--output-dir", "/tmp/casts"], "outputDir", "/tmp/casts"],
+    [["-f", "basic"], "filter", "basic"],
+    [["--filter", "^demo"], "filter", "^demo"],
+    [["--dry-run"], "dryRun", true],
+  ] as const)("parses %j → %s", (args, field, expected) => {
+    const flags = parseCliFlags([...args]);
+    expect(flags[field]).toBe(expected);
   });
 
   test("--load-tmux-conf and --load-asciinema-conf", () => {
@@ -47,10 +37,6 @@ describe("parseCliFlags", () => {
     ]);
     expect(flags.loadTmuxConf).toBe(true);
     expect(flags.loadAsciinemaConf).toBe(true);
-  });
-
-  test("--dry-run", () => {
-    expect(parseCliFlags(["--dry-run"]).dryRun).toBe(true);
   });
 
   test("combined flags", () => {
@@ -75,10 +61,12 @@ describe("parseCliFlags", () => {
     expect(() => parseCliFlags(["--headles"])).toThrow();
   });
 
-  test("invalid numeric values return undefined", () => {
-    expect(parseCliFlags(["--parallel", "abc"]).parallel).toBeUndefined();
-    expect(parseCliFlags(["--parallel", "0"]).parallel).toBeUndefined();
-  });
+  test.each(["abc", "0"])(
+    "invalid numeric --parallel %s returns undefined",
+    (val) => {
+      expect(parseCliFlags(["--parallel", val]).parallel).toBeUndefined();
+    },
+  );
 });
 
 const defaultCli = parseCliFlags([]);

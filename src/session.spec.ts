@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createSession, killSession, listPanes, splitPane } from "./session.ts";
 import { TmuxServer } from "./shell.ts";
-import { testSessionName } from "./test-helpers.test.ts";
+import { testSessionName } from "./test-helpers.ts";
 
 const server = new TmuxServer("test-session");
 let sessions: string[] = [];

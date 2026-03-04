@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { capturePane, sendKeys } from "./pane.ts";
-import { useTmuxSession } from "./test-helpers.test.ts";
+import { useTmuxSession } from "./test-helpers.ts";
 import { waitForText } from "./wait.ts";
 
 const { server, target } = useTmuxSession("test-pane");
@@ -8,7 +8,7 @@ const { server, target } = useTmuxSession("test-pane");
 describe("pane operations", () => {
   test("capturePane returns content", async () => {
     const content = await capturePane(server, target);
-    expect(content.length).toBeGreaterThan(0);
+    expect(content).not.toBe("");
   });
 
   test("sendKeys and capturePane round-trip", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { sendKeys } from "./pane.ts";
-import { useTmuxSession } from "./test-helpers.test.ts";
+import { useTmuxSession } from "./test-helpers.ts";
 import { exec, waitForText } from "./wait.ts";
 
 const { server, target } = useTmuxSession("test-wait");

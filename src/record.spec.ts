@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { executeRecording } from "./execute.ts";
-import { castContains, castHeader } from "./test-helpers.test.ts";
+import { castContains, castHeader } from "./test-helpers.ts";
 
 const CAST_FILE = "/tmp/test-record.cast";
 
@@ -18,7 +18,7 @@ describe("record (e2e)", () => {
 
     expect(existsSync(CAST_FILE)).toBe(true);
     const header = castHeader(CAST_FILE);
-    expect(header.version).toBeGreaterThanOrEqual(2);
+    expect(header.version).toBeOneOf([2, 3]);
     expect(castContains(CAST_FILE, "hello-from-record")).toBe(true);
   }, 30_000);
 });

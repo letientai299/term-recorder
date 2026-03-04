@@ -2,47 +2,38 @@ import { describe, expect, test } from "bun:test";
 import { ctrl, KEYS } from "./keys.ts";
 
 describe("KEYS map", () => {
-  test("contains common keys", () => {
-    expect(KEYS.Enter).toBe("\r");
-    expect(KEYS.Tab).toBe("\t");
-    expect(KEYS.Escape).toBe("\x1b");
-    expect(KEYS.Backspace).toBe("\x7f");
-    expect(KEYS.Space).toBe(" ");
-  });
-
-  test("arrow keys are escape sequences", () => {
-    expect(KEYS.Up).toBe("\x1b[A");
-    expect(KEYS.Down).toBe("\x1b[B");
-    expect(KEYS.Right).toBe("\x1b[C");
-    expect(KEYS.Left).toBe("\x1b[D");
-  });
-
-  test("function keys are escape sequences", () => {
-    expect(KEYS.F1).toBe("\x1bOP");
-    expect(KEYS.F5).toBe("\x1b[15~");
-    expect(KEYS.F12).toBe("\x1b[24~");
+  test.each([
+    ["Enter", "Enter"],
+    ["Tab", "Tab"],
+    ["Escape", "Escape"],
+    ["Backspace", "BSpace"],
+    ["Space", "Space"],
+    ["Up", "Up"],
+    ["Down", "Down"],
+    ["Right", "Right"],
+    ["Left", "Left"],
+    ["F1", "F1"],
+    ["F5", "F5"],
+    ["F12", "F12"],
+  ] as const)("KEYS.%s", (key, expected) => {
+    expect(KEYS[key]).toBe(expected);
   });
 });
 
 describe("ctrl()", () => {
-  test("ctrl+c is 0x03", () => {
-    expect(ctrl("c")).toBe("\x03");
-    expect(ctrl("C")).toBe("\x03");
+  test.each([
+    ["c", "\x03"],
+    ["C", "\x03"],
+    ["a", "\x01"],
+    ["z", "\x1a"],
+  ] as const)("ctrl(%s) === expected", (char, expected) => {
+    expect(ctrl(char)).toBe(expected);
   });
 
-  test("ctrl+a is 0x01", () => {
-    expect(ctrl("a")).toBe("\x01");
-  });
-
-  test("ctrl+z is 0x1a", () => {
-    expect(ctrl("z")).toBe("\x1a");
-  });
-
-  test("throws on multi-char input", () => {
-    expect(() => ctrl("ab")).toThrow();
-  });
-
-  test("throws on out-of-range characters", () => {
-    expect(() => ctrl("1")).toThrow();
+  test.each([
+    ["ab", "expects a single character"],
+    ["1", "expects A-Z"],
+  ])("throws on invalid input %s", (char, msg) => {
+    expect(() => ctrl(char)).toThrow(msg);
   });
 });

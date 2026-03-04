@@ -32,10 +32,11 @@ describe("createPaneProxy", () => {
     const queue = new ActionQueue(server, cfg);
     const pane = createPaneProxy(queue, "test:0.0");
     pane.send("hello").enter().key("Up");
-    expect(queue.actions).toHaveLength(3);
-    expect(queue.actions[0]?.kind).toBe("send");
-    expect(queue.actions[1]?.kind).toBe("enter");
-    expect(queue.actions[2]?.kind).toBe("key");
+    expect(queue.actions).toMatchObject([
+      { kind: "send" },
+      { kind: "enter" },
+      { kind: "key" },
+    ]);
   });
 
   test("queues exec with timeout", () => {
@@ -79,6 +80,7 @@ describe("createSessionProxy", () => {
     expect(queue.actions).toHaveLength(2);
     const split = queue.actions[0] as ActionOf<"splitH">;
     expect(split.kind).toBe("splitH");
+    expect(split.kind).not.toBe("splitV");
     expect(split.session).toBe("test-session");
     expect(split.percent).toBe(50);
     expect(split.placeholder).toBeString();

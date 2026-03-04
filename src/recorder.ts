@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { capturePane, sendKeys } from "./pane.ts";
@@ -14,6 +14,8 @@ export interface RecordingHandle {
   headfulProc?: ReturnType<typeof Bun.spawn>;
   /** Temp dir for asciinema config isolation — cleaned up on stop. */
   ascConfigDir?: string;
+  /** Absolute path to the cast file — used to poll for write completion. */
+  castFile?: string;
 }
 
 /**
@@ -28,6 +30,26 @@ function asciinemaEnv(userAsciinemaConf: boolean): {
   if (userAsciinemaConf) return { env: {} };
   const dir = mkdtempSync(join(tmpdir(), "tr-asc-"));
   return { env: { ASCIINEMA_CONFIG_HOME: dir }, dir };
+}
+
+/** Poll until pane has non-empty content, or throw after timeout. */
+async function waitForPaneContent(
+  server: TmuxServer,
+  target: string,
+  timeoutMs: number,
+  label: string,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const content = await capturePane(server, target);
+      if (content.trim().length > 0) return;
+    } catch {
+      // Session/pane may not exist yet
+    }
+    await Bun.sleep(100);
+  }
+  throw new Error(`${label}: pane ${target} had no content after ${timeoutMs}ms`);
 }
 
 /**
@@ -64,8 +86,14 @@ export async function startRecording(
       stdio: ["inherit", "inherit", "inherit"],
       env: { ...process.env, ...asc.env },
     });
-    await Bun.sleep(1500);
-    return { headfulProc: proc, ascConfigDir: asc.dir };
+    // 14a: Poll main session pane instead of fixed 1500ms sleep
+    await waitForPaneContent(
+      server,
+      `${mainSession}:0.0`,
+      10_000,
+      "headful startup",
+    );
+    return { headfulProc: proc, ascConfigDir: asc.dir, castFile: absCast };
   }
 
   // Headless: run in a detached tmux capture session
@@ -81,7 +109,13 @@ export async function startRecording(
   }
   // Respawn the pane so it inherits the new environment
   await server.tmux("respawn-pane", "-t", `${captureName}:0.0`, "-k");
-  await Bun.sleep(300);
+  // 14b: Poll for shell prompt instead of fixed 300ms sleep
+  await waitForPaneContent(
+    server,
+    `${captureName}:0.0`,
+    5_000,
+    "respawn-pane",
+  );
 
   await sendKeys(server, `${captureName}:0.0`, cmd);
   await sendKeys(server, `${captureName}:0.0`, "\r", false);
@@ -102,8 +136,14 @@ export async function startRecording(
       `asciinema failed to start within 10s for session ${mainSession}`,
     );
   }
-  await Bun.sleep(500);
-  return { ascConfigDir: asc.dir };
+  // 14c: Poll main session pane instead of fixed 500ms sleep
+  await waitForPaneContent(
+    server,
+    `${mainSession}:0.0`,
+    5_000,
+    "headless main session",
+  );
+  return { ascConfigDir: asc.dir, castFile: absCast };
 }
 
 /**
@@ -123,7 +163,21 @@ export async function stopRecording(
   if (handle?.headfulProc) {
     await handle.headfulProc.exited;
   } else {
-    await Bun.sleep(1000);
+    // 14e: Poll cast file for write completion instead of fixed 1000ms sleep
+    if (handle?.castFile) {
+      const deadline = Date.now() + 10_000;
+      let lastSize = -1;
+      while (Date.now() < deadline) {
+        try {
+          const { size } = statSync(handle.castFile);
+          if (size > 0 && size === lastSize) break;
+          lastSize = size;
+        } catch {
+          // File may not exist yet
+        }
+        await Bun.sleep(100);
+      }
+    }
     await killSession(server, captureName);
   }
 

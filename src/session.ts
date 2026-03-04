@@ -30,9 +30,11 @@ export async function createSession(
   await server.tmux("set-option", "-t", name, "base-index", "0");
   await server.tmux("set-option", "-t", name, "-w", "pane-base-index", "0");
   // Move window to index 0 if user config created it at a different index
-  await server.tmux("move-window", "-s", `${name}:1`, "-t", `${name}:0`).catch(
-    () => {},
-  );
+  if (server.userConf) {
+    await server
+      .tmux("move-window", "-s", `${name}:1`, "-t", `${name}:0`)
+      .catch(() => {});
+  }
   // Disable status bar so it doesn't eat a row or cause line-wrap issues
   await server.tmux("set-option", "-t", name, "status", "off");
 

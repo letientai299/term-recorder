@@ -12,7 +12,8 @@ const py = record("python-repl", (s) => {
 });
 
 const vim = record("vim-edit", (s) => {
-  s.exec("echo 'hello world' > /tmp/tr-test.txt");
+  s.detectPrompt();
+  s.reply("echo 'hello world' > /tmp/tr-test.txt");
   s.run("vim /tmp/tr-test.txt");
   s.pause();
   s.key("Down");
@@ -23,7 +24,7 @@ const vim = record("vim-edit", (s) => {
   s.pause(500);
   s.run("cat /tmp/tr-test.txt");
   s.pause();
-  s.exec("rm /tmp/tr-test.txt");
+  s.reply("rm /tmp/tr-test.txt");
 });
 
 const less = record("less-pager", (s) => {

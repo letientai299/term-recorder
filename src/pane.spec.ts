@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { capturePane, sendKeys } from "./pane.ts";
 import { useTmuxSession } from "./test-helpers.ts";
-import { exec, waitForText } from "./wait.ts";
+import { waitForText } from "./wait.ts";
 
 const { server, target } = useTmuxSession("test-pane-wait");
 
@@ -31,11 +31,5 @@ describe("waitForText", () => {
     expect(
       waitForText(server, target, "NEVER_APPEARS_XYZ", 200),
     ).rejects.toThrow("timed out");
-  });
-});
-
-describe("exec", () => {
-  test("waits for command to complete", async () => {
-    await exec(server, target, "echo EXEC_DONE", 5000);
   });
 });

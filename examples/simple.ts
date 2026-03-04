@@ -16,10 +16,8 @@ const split = record("split", (s) => {
   right.run("ls");
 });
 
-const exec = record("exec-wait", (s) => {
-  s.run("echo 'Running a slow command...'");
-  s.exec("sleep 2 && echo 'DONE: slow command finished'");
-  s.run("echo 'Now using waitForText...'");
+const wait = record("wait-text", (s) => {
+  s.run("echo 'Demonstrating waitForText...'");
   s.run("(sleep 1 && echo MARKER_READY) &");
   s.waitForText("MARKER_READY", 5000);
   s.run("echo 'Detected MARKER_READY — continuing.'");
@@ -46,4 +44,4 @@ const topBottom = record("top-bottom", (s) => {
   s.run("echo 'Demo complete.'");
 });
 
-await main(config, [hello, split, exec, keys, topBottom]);
+await main(config, [hello, split, wait, keys, topBottom]);

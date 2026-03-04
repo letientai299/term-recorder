@@ -38,18 +38,6 @@ describe("createPaneProxy", () => {
       { kind: "key" },
     ]);
   });
-
-  test("queues exec with timeout", () => {
-    const queue = new ActionQueue(server, cfg);
-    const pane = createPaneProxy(queue, "test:0.0");
-    pane.exec("ls -la", 5000);
-    expect(queue.actions[0]).toEqual({
-      kind: "exec",
-      pane: "test:0.0",
-      cmd: "ls -la",
-      timeout: 5000,
-    });
-  });
 });
 
 describe("createSessionProxy", () => {

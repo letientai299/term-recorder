@@ -45,7 +45,6 @@ export interface ActionDefs {
   type: { pane: string; text: string; delayMs?: number };
   key: { pane: string; name: Key };
   enter: { pane: string };
-  exec: { pane: string; cmd: string; timeout?: number };
   sleep: { ms: number };
   waitForText: { pane: string; text: string; timeout?: number };
   waitForPrompt: { pane: string; prompt?: string; timeout?: number };
@@ -90,14 +89,6 @@ export interface Pane {
   key(name: Key): Pane;
   /** Press Enter. Shorthand for `.key("Enter")`. */
   enter(): Pane;
-  /**
-   * Run a shell command and block until the prompt returns.
-   * Internally wraps the command in a subshell with an EXIT trap that signals
-   * tmux `wait-for`, so pipes, semicolons, and compound commands all work.
-   * @param cmd - Shell command to execute.
-   * @param timeout - Max wait time in ms. Default: 5 000.
-   */
-  exec(cmd: string, timeout?: number): Pane;
   /** Pause for a fixed duration. Does not add an extra {@link Config.actionDelay} after itself. */
   sleep(ms: number): Pane;
   /**

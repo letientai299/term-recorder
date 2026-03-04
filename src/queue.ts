@@ -5,7 +5,6 @@ import type { TmuxServer } from "./shell.ts";
 import type { Action, ActionKind, ActionOf, Pane, Session } from "./types.ts";
 import {
   detectPrompt,
-  exec,
   waitForPrompt,
   waitForText,
   waitForTitle,
@@ -83,9 +82,6 @@ export class ActionQueue {
     enter: async (a) => {
       await sendKeys(this.server, a.pane, "\r", false);
     },
-    exec: async (a) => {
-      await exec(this.server, a.pane, a.cmd, a.timeout);
-    },
     sleep: async (a) => {
       await Bun.sleep(a.ms);
     },
@@ -122,15 +118,13 @@ export class ActionQueue {
     const detail =
       "text" in action
         ? `"${action.text}"`
-        : "cmd" in action
-          ? `"${action.cmd}"`
-          : "name" in action
-            ? action.name
-            : "title" in action
-              ? `"${action.title}"`
-              : "ms" in action
-                ? `${action.ms}ms`
-                : "";
+        : "name" in action
+          ? action.name
+          : "title" in action
+            ? `"${action.title}"`
+            : "ms" in action
+              ? `${action.ms}ms`
+              : "";
     const target =
       "pane" in action
         ? `→ ${action.pane}`
@@ -163,10 +157,6 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
     },
     enter() {
       queue.push({ kind: "enter", pane: target });
-      return api;
-    },
-    exec(cmd: string, timeout?: number) {
-      queue.push({ kind: "exec", pane: target, cmd, timeout });
       return api;
     },
     sleep(ms: number) {

@@ -48,7 +48,7 @@ import type { Key } from "./keys.ts";
 export interface ActionDefs {
   send: { pane: string; text: string };
   type: { pane: string; text: string; delayMs?: number };
-  key: { pane: string; name: Key };
+  key: { pane: string; names: Key[] };
   enter: { pane: string };
   sleep: { ms: number };
   waitForText: { pane: string; text: string; timeout?: number };
@@ -86,13 +86,16 @@ export interface Pane {
    */
   type(text: string, delayMs?: number): Pane;
   /**
-   * Send a named key. Available names: `Escape`, `Enter`, `Tab`, `Backspace`, `Space`,
+   * Send one or more named keys. Multiple keys are sent back-to-back without
+   * a {@link Pane.pace | pace} delay between them.
+   *
+   * Available names: `Escape`, `Enter`, `Tab`, `Backspace`, `Space`,
    * `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `Insert`, `Delete`,
    * `PageUp`, `PageDown`, `F1`–`F12`.
    *
    * Modifier combos are also supported: `"ctrl-c"`, `"alt-x"`, `"shift-Tab"`.
    */
-  key(name: Key): Pane;
+  key(...names: Key[]): Pane;
   /** Press Enter. Shorthand for `.key("Enter")`. */
   enter(): Pane;
   /** Pause for a fixed duration. Does not add an extra {@link Config.actionDelay} after itself. */

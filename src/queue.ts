@@ -85,7 +85,9 @@ export class ActionQueue {
       }
     },
     key: async (a) => {
-      await sendKey(this.server, a.pane, a.name);
+      for (const name of a.names) {
+        await sendKey(this.server, a.pane, name);
+      }
     },
     enter: async (a) => {
       await sendKeys(this.server, a.pane, "\r", false);
@@ -129,8 +131,8 @@ export class ActionQueue {
     const detail =
       "text" in action
         ? `"${action.text}"`
-        : "name" in action
-          ? action.name
+        : "names" in action
+          ? action.names.join(" ")
           : "title" in action
             ? `"${action.title}"`
             : "ms" in action
@@ -162,8 +164,8 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
       queue.push({ kind: "type", pane: target, text, delayMs });
       return api;
     },
-    key(name: Key) {
-      queue.push({ kind: "key", pane: target, name });
+    key(...names: Key[]) {
+      queue.push({ kind: "key", pane: target, names });
       return api;
     },
     enter() {

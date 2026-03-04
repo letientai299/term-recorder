@@ -9,6 +9,6 @@ description = "Lint and auto-fix"
 run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
 
-[tasks.examples]
-run = "for f in examples/*.ts; do echo \"==> $f\"; bun \"$f\"; done"
-description = "Run all example demo scripts sequentially (headful)"
+[tasks.record]
+run = "bun examples/main.ts {{arg(name=\"flags\", var=true)}}"
+description = "Record demos (pass --headless, --filter, etc.)"

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 interface CastHeaderV2 {
   version: 2;
   width: number;
@@ -36,7 +38,7 @@ export function castRows(header: CastHeader): number {
  * Parse an asciicast v2/v3 file (NDJSON format).
  */
 export function parseCast(path: string): CastFile {
-  const text = require("node:fs").readFileSync(path, "utf-8") as string;
+  const text = readFileSync(path, "utf-8");
   const lines = text.trim().split("\n");
   const firstLine = lines[0];
   if (!firstLine) throw new Error("Empty cast file");
@@ -61,10 +63,13 @@ export function castContains(path: string, text: string): boolean {
 }
 
 /**
- * Get the header of a cast file.
+ * Get the header of a cast file without parsing all events.
  */
 export function castHeader(path: string): CastHeader {
-  return parseCast(path).header;
+  const text = readFileSync(path, "utf-8");
+  const firstLine = text.slice(0, text.indexOf("\n"));
+  if (!firstLine) throw new Error("Empty cast file");
+  return JSON.parse(firstLine) as CastHeader;
 }
 
 /**
@@ -73,9 +78,3 @@ export function castHeader(path: string): CastHeader {
 export function testSessionName(): string {
   return `test-${process.pid}-${Date.now()}`;
 }
-
-/**
- * Set up an isolated tmux server for integration tests.
- * Call in beforeAll/afterAll to avoid hitting user's tmux.conf.
- */
-export { initServer, resetServer } from "./shell.ts";

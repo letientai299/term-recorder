@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
-import { record } from "./index.ts";
+import { executeRecording } from "./execute.ts";
 import { castCols, castContains, castHeader, castRows } from "./test-helpers.test.ts";
 
 const CAST_FILE = "/tmp/test-record.cast";
@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe("record (e2e)", () => {
   test("produces a valid cast file", async () => {
-    await record(CAST_FILE, { cols: 80, rows: 24, idleTimeLimit: 2, mode: "headless" }, (s) => {
+    await executeRecording(CAST_FILE, { cols: 80, rows: 24, idleTimeLimit: 2, mode: "headless" }, (s) => {
       s.type("echo hello-from-record").enter();
       s.sleep(1000);
     });

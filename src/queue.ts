@@ -1,11 +1,10 @@
 import { sendKey, sendKeys } from "./pane.ts";
 import { splitPane } from "./session.ts";
-import {
-  DEFAULT_ACTION_DELAY_MS,
-  DEFAULT_TYPING_DELAY_MS,
-  type Action,
-  type PaneApi,
-  type SessionApi,
+import type { TmuxServer } from "./shell.ts";
+import type {
+  Action,
+  PaneApi,
+  SessionApi,
 } from "./types.ts";
 import { exec, waitForPrompt, waitForText } from "./wait.ts";
 
@@ -24,7 +23,7 @@ export class ActionQueue {
   /** @internal */ paneCount = 0;
 
   constructor(
-    private sessionName: string,
+    private server: TmuxServer,
     private cfg: QueueConfig,
   ) {}
 
@@ -48,29 +47,31 @@ export class ActionQueue {
     switch (action.kind) {
       case "type":
         log(this.cfg, `type "${action.text}" → ${action.pane}`);
-        await sendKeys(action.pane, action.text);
+        await sendKeys(this.server, action.pane, action.text);
         break;
       case "typeHuman": {
         const delay = action.delayMs ?? this.cfg.typingDelay;
-        log(this.cfg, `typeHuman "${action.text}" (${delay}ms/char) → ${action.pane}`);
+        log(
+          this.cfg,
+          `typeHuman "${action.text}" (${delay}ms/char) → ${action.pane}`,
+        );
         for (const char of action.text) {
-          await sendKeys(action.pane, char);
-          const jitter = delay * (0.6 + Math.random() * 0.8);
-          await Bun.sleep(jitter);
+          await sendKeys(this.server, action.pane, char);
+          await Bun.sleep(delay);
         }
         break;
       }
       case "key":
         log(this.cfg, `key ${action.name} → ${action.pane}`);
-        await sendKey(action.pane, action.name);
+        await sendKey(this.server, action.pane, action.name);
         break;
       case "enter":
         log(this.cfg, `enter → ${action.pane}`);
-        await sendKeys(action.pane, "\r", false);
+        await sendKeys(this.server, action.pane, "\r", false);
         break;
       case "exec":
         log(this.cfg, `exec "${action.cmd}" → ${action.pane}`);
-        await exec(action.pane, action.cmd, action.timeout);
+        await exec(this.server, action.pane, action.cmd, action.timeout);
         log(this.cfg, `exec done`);
         break;
       case "sleep":
@@ -79,32 +80,44 @@ export class ActionQueue {
         break;
       case "waitForText":
         log(this.cfg, `waitForText "${action.text}" → ${action.pane}`);
-        await waitForText(action.pane, action.text, action.timeout);
+        await waitForText(
+          this.server,
+          action.pane,
+          action.text,
+          action.timeout,
+        );
         log(this.cfg, `waitForText found`);
         break;
       case "waitForPrompt":
         log(this.cfg, `waitForPrompt "${action.prompt}" → ${action.pane}`);
-        await waitForPrompt(action.pane, action.prompt, action.timeout);
+        await waitForPrompt(
+          this.server,
+          action.pane,
+          action.prompt,
+          action.timeout,
+        );
         log(this.cfg, `waitForPrompt found`);
         break;
       case "splitH": {
-        log(this.cfg, `splitH ${action.percent ?? ""}% → ${action.session}`);
-        await splitPane(action.session, "h", action.percent);
+        log(
+          this.cfg,
+          `splitH ${action.percent ?? ""}% → ${action.session}`,
+        );
+        await splitPane(this.server, action.session, "h", action.percent);
         this.paneCount++;
-        this._lastSplitPaneTarget = `${this.sessionName}:0.${this.paneCount}`;
         break;
       }
       case "splitV": {
-        log(this.cfg, `splitV ${action.percent ?? ""}% → ${action.session}`);
-        await splitPane(action.session, "v", action.percent);
+        log(
+          this.cfg,
+          `splitV ${action.percent ?? ""}% → ${action.session}`,
+        );
+        await splitPane(this.server, action.session, "v", action.percent);
         this.paneCount++;
-        this._lastSplitPaneTarget = `${this.sessionName}:0.${this.paneCount}`;
         break;
       }
     }
   }
-
-  _lastSplitPaneTarget = "";
 }
 
 export function createPaneProxy(queue: ActionQueue, target: string): PaneApi {

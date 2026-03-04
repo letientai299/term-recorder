@@ -47,13 +47,18 @@ export async function sendKey(
 }
 
 /**
- * Capture the full pane content as plain text.
+ * Capture recent pane content as plain text.
+ *
+ * Limits capture to the last 200 lines (visible area + some scrollback)
+ * to avoid transferring the entire scrollback buffer through control mode
+ * on every poll — important when commands produce massive output (e.g. AI agents).
+ * If the pane has fewer lines, tmux returns whatever is available.
  */
 export async function capturePane(
   server: TmuxServer,
   target: string,
 ): Promise<string> {
-  return server.tmux("capture-pane", "-t", target, "-p", "-T", "-S", "-");
+  return server.tmux("capture-pane", "-t", target, "-p", "-T", "-S", "-200");
 }
 
 /**

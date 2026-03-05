@@ -21,3 +21,17 @@ description = "Lint and auto-fix"
 [tasks.fmt]
 run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
+
+[tasks.clean]
+run = "rm -rf casts"
+description = "Remove recorded casts"
+
+[tasks.record]
+depends = ['clean']
+run = "for f in examples/*.ts; do bun \"$f\" --headless & done; wait"
+description = "Record all examples in parallel (headless)"
+
+[tasks."record:ui"]
+depends = ['clean']
+run = "for f in examples/*.ts; do bun \"$f\"; done"
+description = "Run all examples sequentially (headful)"

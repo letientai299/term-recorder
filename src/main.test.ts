@@ -9,6 +9,8 @@ describe("parseCliFlags", () => {
     expect(flags.parallel).toBeUndefined();
     expect(flags.outputDir).toBeUndefined();
     expect(flags.filter).toBeUndefined();
+    expect(flags.cols).toBeUndefined();
+    expect(flags.rows).toBeUndefined();
     expect(flags.loadTmuxConf).toBe(false);
     expect(flags.loadAsciinemaConf).toBe(false);
     expect(flags.dryRun).toBe(false);
@@ -25,6 +27,8 @@ describe("parseCliFlags", () => {
     [["-f", "basic"], "filter", "basic"],
     [["--filter", "^demo"], "filter", "^demo"],
     [["--dry-run"], "dryRun", true],
+    [["--cols", "80"], "cols", 80],
+    [["--rows", "24"], "rows", 24],
   ] as const)("parses %j → %s", (args, field, expected) => {
     const flags = parseCliFlags([...args]);
     expect(flags[field]).toBe(expected);
@@ -64,6 +68,14 @@ describe("parseCliFlags", () => {
       expect(parseCliFlags(["--parallel", val]).parallel).toBeUndefined();
     },
   );
+
+  test.each(["abc", "0"])("invalid --cols %s returns undefined", (val) => {
+    expect(parseCliFlags(["--cols", val]).cols).toBeUndefined();
+  });
+
+  test.each(["abc", "0"])("invalid --rows %s returns undefined", (val) => {
+    expect(parseCliFlags(["--rows", val]).rows).toBeUndefined();
+  });
 });
 
 const defaultCli = parseCliFlags([]);
@@ -96,6 +108,25 @@ describe("resolveOptions", () => {
     expect(resolveOptions({ loadTmuxConf: false }, cli).loadTmuxConf).toBe(
       true,
     );
+  });
+
+  test("CLI --cols/--rows override config", () => {
+    const cli = parseCliFlags(["--cols", "80", "--rows", "24"]);
+    const opts = resolveOptions({ cols: 120, rows: 30 }, cli);
+    expect(opts.cols).toBe(80);
+    expect(opts.rows).toBe(24);
+  });
+
+  test("config cols/rows used when CLI omits them", () => {
+    const opts = resolveOptions({ cols: 100, rows: 40 }, defaultCli);
+    expect(opts.cols).toBe(100);
+    expect(opts.rows).toBe(40);
+  });
+
+  test("cols/rows undefined when neither CLI nor config sets them", () => {
+    const opts = resolveOptions({}, defaultCli);
+    expect(opts.cols).toBeUndefined();
+    expect(opts.rows).toBeUndefined();
   });
 
   test("passes through config fields", () => {

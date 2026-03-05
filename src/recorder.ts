@@ -42,7 +42,8 @@ function sq(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
-function buildAsciinemaCmd(
+/** @internal */
+export function buildAsciinemaCmd(
   server: TmuxServer,
   mainSession: string,
   absCast: string,

@@ -19,8 +19,12 @@ import {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Rewrite the cols/rows in a v2/v3 asciicast header to the intended size. */
-function patchCastHeader(path: string, cols: number, rows: number): void {
+/** @internal Rewrite the cols/rows in a v2/v3 asciicast header to the intended size. */
+export function patchCastHeader(
+  path: string,
+  cols: number,
+  rows: number,
+): void {
   try {
     const content = readFileSync(path, "utf-8");
     const nl = content.indexOf("\n");

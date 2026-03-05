@@ -36,6 +36,8 @@ export class ActionQueue {
   private prompts = new Map<string, string>();
   /** Per-pane minimum delay (ms) set via `pace()`. */
   private paces = new Map<string, number>();
+  /** Current position during drain — used by resolvePlaceholder to skip already-executed actions. */
+  private drainIndex = 0;
 
   constructor(
     private server: TmuxServer,
@@ -47,8 +49,12 @@ export class ActionQueue {
   }
 
   async drain(): Promise<void> {
-    while (this.actions.length > 0) {
-      const action = this.actions.shift();
+    for (
+      this.drainIndex = 0;
+      this.drainIndex < this.actions.length;
+      this.drainIndex++
+    ) {
+      const action = this.actions[this.drainIndex];
       if (!action) break;
       await this.execute(action);
       // Auto-pause between actions (skip for sleep and pace)
@@ -63,6 +69,8 @@ export class ActionQueue {
         if (delay > 0) await sleep(delay);
       }
     }
+    this.actions.length = 0;
+    this.drainIndex = 0;
   }
 
   /** Replace placeholder targets in remaining queued actions with the actual pane_id. */
@@ -71,8 +79,9 @@ export class ActionQueue {
     paneId: string,
   ): void {
     if (!placeholder) return;
-    for (const a of this.actions) {
-      if ("pane" in a && a.pane === placeholder) {
+    for (let i = this.drainIndex + 1; i < this.actions.length; i++) {
+      const a = this.actions[i];
+      if (a && "pane" in a && a.pane === placeholder) {
         (a as { pane: string }).pane = paneId;
       }
     }

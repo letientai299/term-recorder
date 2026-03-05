@@ -120,6 +120,8 @@ export interface Pane {
    * `PageUp`, `PageDown`, `F1`–`F12`.
    *
    * Modifier combos are also supported: `"ctrl-c"`, `"alt-x"`, `"shift-Tab"`.
+   * `shift` only works with named keys (e.g. `"shift-Tab"`, `"shift-F1"`), not letters.
+   * `cmd-` and `opt-` are macOS aliases for `alt` (Meta) — the real Command key cannot be sent through tmux.
    */
   key(...names: Key[]): Pane;
   /** Press Enter. Shorthand for `.key("Enter")`. */
@@ -131,6 +133,8 @@ export interface Pane {
   /**
    * Block until `text` appears anywhere in the pane content.
    * Re-checks on `%output` notifications with a 500ms fallback poll.
+   * Only the last 200 lines of pane output are checked — text scrolled beyond
+   * that is not visible to this or any other wait action.
    * @param text - Substring to search for.
    * @param timeout - Max wait time in ms. Default: 5 000.
    */
@@ -147,6 +151,7 @@ export interface Pane {
    * Detect the prompt string of the current shell or REPL. Types a random marker,
    * captures the pane to find the text preceding it (the prompt), then erases the marker.
    * The detected prompt is stored and used by subsequent {@link waitForPrompt} calls with no argument.
+   * Trailing whitespace is trimmed from the detected prompt, so `waitForPrompt()` matches the trimmed form.
    * @param timeout - Max wait time in ms. Default: 5 000.
    */
   detectPrompt(timeout?: number): Pane;

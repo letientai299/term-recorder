@@ -29,8 +29,8 @@ const config = defineConfig();
 
 await main(config, [
   record("hello", (s) => {
-    s.type("echo 'Hello from term-recorder!'").enter();
-    s.type("ls -la").enter();
+    s.send("echo 'Hello from term-recorder!'");
+    s.send("ls -la");
   }),
 ]);
 ```
@@ -38,8 +38,8 @@ await main(config, [
 Run it:
 
 ```sh
-npx tsx demos.ts    # Node.js
 bun demos.ts        # Bun
+npx tsx demos.ts    # Node.js
 ```
 
 Output lands in `./casts/hello.cast` by default. Play it back:
@@ -47,6 +47,59 @@ Output lands in `./casts/hello.cast` by default. Play it back:
 ```sh
 asciinema play casts/hello.cast
 ```
+
+## CLI flags
+
+All flags are optional — defaults work for most cases. Pass `--help` to see the
+full list:
+
+```
+USAGE bun demos.ts [OPTIONS]
+
+OPTIONS
+
+              -h, --help    Show this help message
+              --headless    No visible terminal; auto-parallel at cpus/2
+      -p, --parallel=<N>    Max concurrent recordings (default: 1, or cpus/2 if headless)
+  -o, --output-dir=<DIR>    Output directory (default: ./casts)
+    -f, --filter=<REGEX>    Run only recordings whose name matches this regex
+              --cols=<N>    Terminal columns (default: 120)
+              --rows=<N>    Terminal rows (default: 30)
+        --load-tmux-conf    Use your tmux.conf instead of a clean config
+               --dry-run    Print recording names and exit
+   --trailing-delay=<MS>    Idle time before ending so the last frame stays visible (default: 1000)
+             --pace=<MS>    Delay after each pane action (default: 1000, 0 to disable)
+     --typing-delay=<MS>    Per-character delay for type() actions (default: 30)
+     --action-delay=<MS>    Auto-pause inserted between queued actions (default: 200)
+```
+
+## API
+
+The `record()` callback receives a `Session` (the main pane) and a
+`RunnerConfig` with resolved settings. All methods are chainable and queue
+actions — nothing executes until `main()` drains the queue. See the TSDoc on
+each method for details.
+
+The table below maps APIs to examples that demonstrate them:
+
+| API                              | Examples                           |
+| -------------------------------- | ---------------------------------- |
+| `type`, `enter`, `key`           | [simple], [fzf], [interactive-tui] |
+| `run`, `reply`                   | [interactive-tui], [render-test]   |
+| `send`                           | [ruler], [fzf]                     |
+| `splitH`, `splitV`               | [simple]                           |
+| `waitForText`, `waitForIdle`     | [agents], [simple]                 |
+| `detectPrompt`, `waitForPrompt`  | [ruler], [interactive-tui]         |
+| `pace`, `sleep`                  | [render-test], [interactive-tui]   |
+| `RunnerConfig` (second callback) | [ruler]                            |
+| `defineConfig` (shell, env, cwd) | [ruler], [interactive-tui]         |
+
+[simple]: examples/simple.ts
+[fzf]: examples/fzf.ts
+[interactive-tui]: examples/interactive-tui.ts
+[render-test]: examples/render-test.ts
+[agents]: examples/agents.ts
+[ruler]: examples/ruler.ts
 
 ## How it works
 
@@ -73,8 +126,9 @@ flowchart TD
     B -->|push actions| C[ActionQueue]
     C -->|drain| D[TmuxServer]
     D -->|control mode| E[tmux server]
-    D -->|spawn| G[asciinema rec]
     E -->|pty I/O| F[Shell / program]
+
+    D -->|spawn before drain| G[asciinema rec]
     G -->|tmux attach| E
     G -->|write| H[.cast file]
 
@@ -120,10 +174,12 @@ const config = defineConfig({
 });
 ```
 
-`--no-rcs` skips all zsh startup files so nothing overrides the prompt. `%~`
-shows the full path from home, `%F{cyan}` adds color. The two `zsh` invocations
-are intentional: the outer one runs `-c` to set `PS1`, then `exec zsh --no-rcs`
-replaces it with an interactive shell that inherits the variable.
+The two `zsh` invocations are intentional: the outer one runs `-c` to set `PS1`,
+then `exec zsh --no-rcs` replaces it with an interactive shell that inherits the
+variable.
+
+- `%~` shows the full path from home, `%F{cyan}` adds color.
+- `--no-rcs` skips all zsh startup files so nothing overrides the prompt.
 
 ### Session-level environment variables
 
@@ -140,102 +196,41 @@ inherits them automatically. This is useful for controlling tool behavior
 (`EDITOR`, `PAGER`), ensuring color support (`TERM`, `COLORTERM`), or hiding
 personal details (`HOME`, `USER`).
 
+### Converting casts to GIFs
+
+The `.cast` format is great for playback with copyable text content. But, it's
+not widely supported. Use [agg][agg] to convert to GIF for sharing:
+
+```sh
+agg casts/hello.cast casts/hello.gif
+```
+
+For SVG output, use [svg-term][svg-term] instead.
+
+This project includes a [`scripts/cast-to-gif.ts`][cast2gif] script that
+batch-converts all casts with [FiraCode Nerd Font][firacode-nf] and symbol
+fallbacks — see [docs/contributing.md](docs/contributing.md) for the `mise gif`
+task that wraps it.
+
+[cast2gif]: ./scripts/cast-to-gif.ts
+
 ## Development
 
-[mise][mise] manages all dev tools. After cloning:
-
-```sh
-mise install      # installs bun, tmux, asciinema, agg, prek
-bun install       # installs npm dependencies
-prek install      # activates git hooks (lint, fmt, test on commit)
-```
-
-On Windows, use [WSL 2][wsl] — tmux has no native Windows port. Inside WSL the
-setup is identical.
-
-See `mise tasks` for available commands.
-
-### Building
-
-```sh
-mise build        # compile TypeScript to dist/
-```
-
-Produces `.js`, `.d.ts`, `.d.ts.map`, and `.js.map` files in `dist/`.
-`prepublishOnly` runs this automatically before `npm publish`.
-
-### Recording
-
-```sh
-mise record        # headless, parallel — outputs to casts/*.cast
-mise record:ui     # headful, sequential — same output, visible terminal
-```
-
-Both tasks track `src/**/*.ts` and `examples/**/*.ts` as inputs and
-`casts/*.cast` as outputs. mise skips re-recording when sources haven't changed.
-Use `mise run --force record` to bypass the check, or `mise clean` to wipe
-`casts/` and `dist/` first.
-
-### GIF generation
-
-```sh
-mise gif
-```
-
-Converts all `casts/*.cast` to `casts/*.gif`. On first run, it downloads
-[FiraCode Nerd Font][firacode-nf] into `.fonts/` (cached for subsequent runs).
-
-Like the record tasks, `mise gif` skips when outputs are newer than inputs.
-
-### Other tasks
-
-| Task            | Description                   |
-| --------------- | ----------------------------- |
-| `mise build`    | Compile TypeScript to `dist/` |
-| `mise test`     | Unit tests                    |
-| `mise e2e`      | End-to-end tests (needs tmux) |
-| `mise test:all` | All tests                     |
-| `mise lint`     | Type-check and lint           |
-| `mise fmt`      | Format with Prettier          |
-| `mise clean`    | Remove `casts/` and `dist/`   |
-
-### Publishing
-
-```sh
-npm version patch   # or minor, major — commits and tags automatically
-git push && git push --tags
-npm publish --access public
-```
-
-`prepublishOnly` runs `mise build` before packing, so `dist/` is always fresh.
+See [docs/contributing.md](docs/contributing.md).
 
 ## Limitations
 
-- **External tool dependency.** Requires tmux 3.4+ and asciinema 3.0+ on the
-  host system. Contributors can use `mise install` to get both automatically.
-- **asciicast only.** Outputs `.cast` files. Convert with [agg][agg],
-  [svg-term][svg-term], or similar post-processing tools.
-- **Headful mode is sequential.** Concurrency is locked to 1 because asciinema
-  occupies the foreground terminal.
-- **200-line scrollback capture.** `capturePane` fetches the last 200 lines.
-  Text scrolled beyond that cannot be matched by `waitForText`.
-- **No per-action error recovery.** A timeout or tmux error during `drain()`
-  aborts the entire recording.
+- **External tool dependency.** Requires tmux 3.4+ and asciinema 3.0+ installed
+  on the host. Contributors can use `mise install` to get both automatically.
+- **No per-action error recovery.** If a wait action times out, the entire
+  recording is aborted. There is no way to catch and retry individual actions.
 - **Serialized tmux commands.** The control mode mutex means no two tmux
   commands run simultaneously, even across different panes. Multi-pane scripts
   are sequential at the I/O layer.
-- **`waitForIdle` silence window is fixed.** The 500 ms output-silence threshold
-  is not configurable.
-- **`shift-<letter>` unsupported.** The `shift` modifier only works with named
-  keys (`shift-Tab`, `shift-F1`), not letters.
-- **`cmd-`/`opt-` map to Meta.** macOS-specific modifiers are aliases for `alt`.
-  The real macOS Command key cannot be sent through tmux.
-- **`detectPrompt` trims trailing spaces.** Prompts ending with whitespace are
-  stored trimmed, so `waitForPrompt()` matches the trimmed form.
 
 [agg]: https://github.com/asciinema/agg
+[ffmpeg]: https://ffmpeg.org
 [firacode-nf]: https://github.com/ryanoasis/nerd-fonts/releases
-[mise]: https://mise.jdx.dev
 [asciicast]: https://docs.asciinema.org/manual/asciicast/v2/
 [asciinema]: https://asciinema.org
 [svg-term]: https://github.com/marionebl/svg-term-cli
@@ -243,4 +238,3 @@ npm publish --access public
 [tmux-cc]: https://github.com/tmux/tmux/wiki/Control-Mode
 [tmux-install]: https://github.com/tmux/tmux/wiki/Installing
 [asciinema-install]: https://docs.asciinema.org/manual/cli/installation/
-[wsl]: https://learn.microsoft.com/en-us/windows/wsl/install

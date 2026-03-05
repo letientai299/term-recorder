@@ -138,46 +138,32 @@ export async function waitForIdle(
 ): Promise<void> {
   const deadline = Date.now() + timeout;
 
-  // Snapshot current foreground command
-  const initialCmd = (
-    await server.tmux(
-      "display-message",
-      "-t",
-      target,
-      "-p",
-      "#{pane_current_command}",
-    )
-  ).trim();
+  // Phase 1: wait for any change (output or command change).
+  // Use a subscription for push-based command-change detection instead of
+  // polling display-message every iteration.
+  const subName = `tr-idle-${process.pid}-${++subscriptionCounter}`;
+  await server.subscribe(subName, target, "#{pane_current_command}");
 
-  // Phase 1: wait for any change (output or command change)
   let changed = false;
-  while (Date.now() < deadline) {
+  try {
     const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
-
-    // Check command change
-    const currentCmd = (
-      await server.tmux(
-        "display-message",
-        "-t",
-        target,
-        "-p",
-        "#{pane_current_command}",
-      )
-    ).trim();
-    if (currentCmd !== initialCmd) {
-      changed = true;
-      break;
+    if (remaining <= 0) {
+      throw new Error(`waitForIdle timed out after ${timeout}ms on ${target}`);
     }
 
-    // Listen for output with a short timeout to recheck command
-    const before = Date.now();
-    await waitForOutputHint(server, Math.min(200, remaining));
-    // If resolved faster than the timeout, output arrived
-    if (Date.now() - before < 190) {
-      changed = true;
-      break;
-    }
+    // Race: subscription fires on command change, output hint fires on output
+    await Promise.race([
+      server
+        .waitForSubscription(subName, () => true, remaining)
+        .then(() => {
+          changed = true;
+        }),
+      waitForOutputHint(server, remaining).then(() => {
+        changed = true;
+      }),
+    ]);
+  } finally {
+    await server.unsubscribe(subName);
   }
 
   if (!changed) {
@@ -242,10 +228,8 @@ export async function detectPrompt(
 
   const content = await capturePane(server, target);
 
-  // Erase the marker with backspaces
-  for (const _ of marker) {
-    await server.tmux("send-keys", "-t", target, "BSpace");
-  }
+  // Erase the marker — C-u kills the entire line in one command
+  await server.tmux("send-keys", "-t", target, "C-u");
 
   for (const line of content.split("\n")) {
     const idx = line.indexOf(marker);

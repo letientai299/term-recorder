@@ -254,7 +254,10 @@ export class TmuxServer {
     const colonIdx = rest.indexOf(" : ", spaceIdx);
     const value = colonIdx >= 0 ? rest.slice(colonIdx + 3) : "";
     const cbs = this.subscriptions.get(name);
-    if (cbs) for (const cb of [...cbs]) cb(value);
+    if (cbs) {
+      // Snapshot length — safe if a callback removes itself during iteration.
+      for (let i = 0, len = cbs.length; i < len; i++) cbs[i]?.(value);
+    }
   }
 
   /** Reject any pending command response (called on stream close). */

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": true,
+    "allowJs": false,
+    "allowImportingTsExtensions": false,
+    "jsx": null
+  },
+  "include": ["src"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "src/test-helpers.ts"]
+}

@@ -6,15 +6,14 @@ produce [asciicast][asciicast] files you can play back with
 
 ## Requirements
 
-- [Bun][bun] (runtime)
-- [tmux][tmux] 3.4+ (session management — uses control mode subscriptions and
-  `capture-pane -T`)
-- [asciinema][asciinema] 3.0+ (recording — uses `rec --overwrite --headless`)
+- [tmux][tmux-install] 3.4+ (session management)
+- [asciinema][asciinema-install] 3.0+ (recording)
+- Node.js 20+, Bun, or Deno (runtime)
 
 ## Install
 
 ```sh
-bun install
+npm install term-recorder
 ```
 
 ## Quick start
@@ -22,7 +21,7 @@ bun install
 Create a script file (e.g. `demos.ts`):
 
 ```ts
-import { defineConfig, main, record } from "./src/index.ts";
+import { defineConfig, main, record } from "term-recorder";
 
 const config = defineConfig();
 
@@ -37,7 +36,8 @@ await main(config, [
 Run it:
 
 ```sh
-bun demos.ts
+npx tsx demos.ts    # Node.js
+bun demos.ts        # Bun
 ```
 
 Output lands in `./casts/hello.cast` by default. Play it back:
@@ -99,13 +99,71 @@ flowchart TD
   terminal (sequential only). Headless mode uses `asciinema rec --headless` and
   auto-parallelizes to `cpus / 2`.
 
+## Development
+
+[mise][mise] manages all dev tools. After cloning:
+
+```sh
+mise install      # installs bun, tmux, asciinema, agg, prek
+bun install       # installs npm dependencies
+prek install      # activates git hooks (lint, fmt, test on commit)
+```
+
+On Windows, use [WSL 2][wsl] — tmux has no native Windows port. Inside WSL the
+setup is identical.
+
+See `mise tasks` for available commands.
+
+### Building
+
+```sh
+mise build        # compile TypeScript to dist/
+```
+
+Produces `.js`, `.d.ts`, `.d.ts.map`, and `.js.map` files in `dist/`.
+`prepublishOnly` runs this automatically before `npm publish`.
+
+### Recording
+
+```sh
+mise record        # headless, parallel — outputs to casts/*.cast
+mise record:ui     # headful, sequential — same output, visible terminal
+```
+
+Both tasks track `src/**/*.ts` and `examples/**/*.ts` as inputs and
+`casts/*.cast` as outputs. mise skips re-recording when sources haven't changed.
+Use `mise run --force record` to bypass the check, or `mise clean` to wipe
+`casts/` and `dist/` first.
+
+### GIF generation
+
+```sh
+mise gif
+```
+
+Converts all `casts/*.cast` to `casts/*.gif`. On first run, it downloads
+[FiraCode Nerd Font][firacode-nf] into `.fonts/` (cached for subsequent runs).
+
+Like the record tasks, `mise gif` skips when outputs are newer than inputs.
+
+### Other tasks
+
+| Task            | Description                   |
+| --------------- | ----------------------------- |
+| `mise build`    | Compile TypeScript to `dist/` |
+| `mise test`     | Unit tests                    |
+| `mise e2e`      | End-to-end tests (needs tmux) |
+| `mise test:all` | All tests                     |
+| `mise lint`     | Type-check and lint           |
+| `mise fmt`      | Format with Prettier          |
+| `mise clean`    | Remove `casts/` and `dist/`   |
+
 ## Limitations
 
-- **External tool dependency.** Requires tmux 3.4+ and asciinema 3.0+ installed
-  on the system. No bundled or fallback implementation.
-- **asciicast only.** Outputs `.cast` files. No SVG, GIF, or MP4. Use
-  post-processing tools like [agg][agg] or [svg-term][svg-term] for other
-  formats.
+- **External tool dependency.** Requires tmux 3.4+ and asciinema 3.0+ on the
+  host system. Contributors can use `mise install` to get both automatically.
+- **asciicast only.** Outputs `.cast` files. Convert with [agg][agg],
+  [svg-term][svg-term], or similar post-processing tools.
 - **Fixed terminal size.** Sessions start at 100×40. The dimensions are not
   configurable.
 - **Headful mode is sequential.** Concurrency is locked to 1 because asciinema
@@ -127,9 +185,13 @@ flowchart TD
   stored trimmed, so `waitForPrompt()` matches the trimmed form.
 
 [agg]: https://github.com/asciinema/agg
+[firacode-nf]: https://github.com/ryanoasis/nerd-fonts/releases
+[mise]: https://mise.jdx.dev
 [asciicast]: https://docs.asciinema.org/manual/asciicast/v2/
 [asciinema]: https://asciinema.org
-[bun]: https://bun.sh
 [svg-term]: https://github.com/marionebl/svg-term-cli
 [tmux]: https://github.com/tmux/tmux
 [tmux-cc]: https://github.com/tmux/tmux/wiki/Control-Mode
+[tmux-install]: https://github.com/tmux/tmux/wiki/Installing
+[asciinema-install]: https://docs.asciinema.org/manual/cli/installation/
+[wsl]: https://learn.microsoft.com/en-us/windows/wsl/install

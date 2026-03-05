@@ -86,7 +86,7 @@ export async function waitForText(
   server: TmuxServer,
   target: string,
   text: string,
-  timeout = DEFAULT_TIMEOUT,
+  timeout: number = DEFAULT_TIMEOUT,
 ): Promise<void> {
   return pollPane(
     server,
@@ -104,7 +104,7 @@ export async function waitForPrompt(
   server: TmuxServer,
   target: string,
   prompt: string,
-  timeout = DEFAULT_TIMEOUT,
+  timeout: number = DEFAULT_TIMEOUT,
 ): Promise<void> {
   return pollPane(
     server,
@@ -195,7 +195,7 @@ export async function waitForTitle(
   server: TmuxServer,
   target: string,
   title: string,
-  timeout = DEFAULT_TIMEOUT,
+  timeout: number = DEFAULT_TIMEOUT,
 ): Promise<void> {
   const name = `tr-title-${process.pid}-${++subscriptionCounter}`;
 
@@ -223,7 +223,7 @@ export async function waitForTitle(
 export async function detectPrompt(
   server: TmuxServer,
   target: string,
-  timeout = DEFAULT_TIMEOUT,
+  timeout: number = DEFAULT_TIMEOUT,
 ): Promise<string> {
   await waitForOutputSilence(server, FALLBACK_POLL_MS);
   const marker = `__tr_probe_${crypto.randomUUID().slice(0, 8)}__`;

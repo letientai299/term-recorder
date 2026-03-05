@@ -1,6 +1,9 @@
 [tools]
 bun = "latest"
-"cargo:prek" = "latest"
+tmux = "latest"
+"github:asciinema/asciinema" = "latest"
+"github:asciinema/agg" = "latest"
+prek = "latest"
 
 [tasks.test]
 run = "bun test -- src/*.test.ts"
@@ -14,8 +17,16 @@ description = "End-to-end tests (requires tmux)"
 run = "bun test"
 description = "All tests (unit + e2e)"
 
+[tasks.build]
+run = "bun tsc --project tsconfig.build.json"
+description = "Compile TypeScript to dist/"
+
 [tasks.lint]
-run = ["bun tsc --noEmit", "bunx biome check --write --unsafe ."]
+run = [
+  "bun tsc --noEmit",
+  "bun tsc --noEmit --project tsconfig.build.json",
+  "bunx biome check --write --unsafe .",
+]
 description = "Lint and auto-fix"
 
 [tasks.fmt]
@@ -23,15 +34,23 @@ run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
 
 [tasks.clean]
-run = "rm -rf casts"
-description = "Remove recorded casts"
+run = "rm -rf casts dist"
+description = "Remove recorded casts and build output"
 
 [tasks.record]
-depends = ['clean']
 run = "for f in examples/*.ts; do bun \"$f\" --headless & done; wait"
+sources = ['src/**/*.ts', 'examples/**/*.ts']
+outputs = ['casts/*.cast']
 description = "Record all examples in parallel (headless)"
 
+[tasks.gif]
+run = "bun scripts/cast-to-gif.ts"
+sources = ['casts/*.cast']
+outputs = ['casts/*.gif']
+description = "Convert all casts to GIFs using agg with FiraCode Nerd Font"
+
 [tasks."record:ui"]
-depends = ['clean']
 run = "for f in examples/*.ts; do bun \"$f\"; done"
+sources = ['src/**/*.ts', 'examples/**/*.ts']
+outputs = ['casts/*.cast']
 description = "Run all examples sequentially (headful)"

@@ -36,6 +36,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # AI artifacts
 .ai.dump
 
+# downloaded fonts
+.fonts
+
 # recordings
 bin
 casts

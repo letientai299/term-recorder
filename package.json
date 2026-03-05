@@ -2,11 +2,14 @@
   "name": "term-recorder",
   "version": "0.1.0",
   "description": "Scriptable terminal recordings — write TypeScript to drive tmux sessions and produce asciicast files",
-  "module": "index.ts",
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
+  "sideEffects": false,
   "keywords": [
     "terminal",
     "recording",
@@ -25,9 +28,12 @@
   "license": "MIT",
   "author": "letientai299",
   "files": [
-    "src",
-    "index.ts"
+    "dist",
+    "src"
   ],
+  "scripts": {
+    "prepublishOnly": "bun run build"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",
     "@types/bun": "latest",

@@ -31,8 +31,11 @@ export async function createSession(
       .tmux("move-window", "-s", `${name}:1`, "-t", `${name}:0`)
       .catch(() => {});
   }
-  // Disable status bar so it doesn't eat a row or cause line-wrap issues
-  await server.tmux("set-option", "-t", name, "status", "off");
+  // Disable status bar unless the user opted into their tmux.conf —
+  // they expect their themed bar visible and accept the lost row.
+  if (!server.userConf) {
+    await server.tmux("set-option", "-t", name, "status", "off");
+  }
   // Prevent tmux from resizing windows to match the attaching client.
   // tmux draws a line border around the window automatically when it is
   // smaller than the client terminal.

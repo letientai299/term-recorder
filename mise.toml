@@ -33,6 +33,11 @@ description = "Lint and auto-fix"
 run = "bunx prettier --write ."
 description = "Format code and docs with Prettier"
 
+[tasks.shim]
+depends = ["build"]
+run = "bun link"
+description = "Build and register the local package globally for bun link"
+
 [tasks.clean]
 run = "rm -rf casts dist"
 description = "Remove recorded casts and build output"

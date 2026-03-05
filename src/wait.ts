@@ -110,8 +110,17 @@ export async function waitForPrompt(
     server,
     target,
     (content) => {
-      const lines = content.split("\n").filter((l) => l.trim().length > 0);
-      return (lines.at(-1) ?? "").includes(prompt);
+      // Reverse scan for last non-empty line — avoids split + filter allocation.
+      let end = content.length;
+      for (;;) {
+        // Trim trailing whitespace/newlines
+        while (end > 0 && content.charCodeAt(end - 1) <= 32) end--;
+        if (end === 0) return false;
+        const start = (content.lastIndexOf("\n", end - 1) + 1) | 0;
+        const line = content.slice(start, end);
+        if (line.trim().length > 0) return line.includes(prompt);
+        end = start > 0 ? start - 1 : 0;
+      }
     },
     timeout,
     `waitForPrompt("${prompt}")`,

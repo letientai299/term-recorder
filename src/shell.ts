@@ -43,10 +43,12 @@ class LineReader {
           const { done, value } = await reader.read();
           if (done) break;
           this.buffer += decoder.decode(value, { stream: true });
-          const parts = this.buffer.split("\n");
-          this.buffer = parts.pop() ?? "";
-          for (const line of parts) {
-            this.lines.push(line);
+          let start = 0;
+          let nlIdx = this.buffer.indexOf("\n", start);
+          while (nlIdx >= 0) {
+            this.lines.push(this.buffer.slice(start, nlIdx));
+            start = nlIdx + 1;
+            nlIdx = this.buffer.indexOf("\n", start);
             if (this.resolve) {
               const cb = this.resolve;
               this.resolve = undefined;
@@ -54,6 +56,7 @@ class LineReader {
               cb();
             }
           }
+          this.buffer = this.buffer.slice(start);
         }
       } catch {
         // Stream closed or errored
@@ -233,9 +236,11 @@ export class TmuxServer {
   /** Parse %output and notify listeners. */
   private handleOutput(line: string): void {
     // Format: %output %<pane-id> <octal-encoded-data>
-    const match = line.match(/^%output (%\d+) /);
-    if (!match) return;
-    const paneId = match[1] ?? "";
+    // Use indexOf instead of regex — this fires on every output notification.
+    const paneStart = 8; // "%output ".length
+    const spaceIdx = line.indexOf(" ", paneStart);
+    if (spaceIdx < 0) return;
+    const paneId = line.slice(paneStart, spaceIdx);
     for (const fn of this.outputListeners) fn(paneId);
   }
 

@@ -1,36 +1,46 @@
-import { tmpdir } from "node:os";
 import { defineConfig, main, record } from "../src";
 
 const config = defineConfig({
-  cols: 100,
+  cols: 80,
   rows: 20,
-  typingDelay: 10,
-  actionDelay: 50,
+  typingDelay: 5,
+  actionDelay: 5,
   shell: "exec zsh --no-rcs",
-  env: { PS1: "%F{cyan}%~%f\n$ " },
+  env: { PS1: "%F{blue}%1~%f $ " },
 });
 
-const dream = `${tmpdir()}/dream.ts`;
+const dream = `./examples/dream.ts`;
 
 const inception = record("inception", (s) => {
-  s.run(`rm ${dream}`);
-  s.run(`vim -u NONE ${dream}`);
-  s.type(`iimport { defineConfig, main, record } from "@letientai299/term-recorder"
+  s.waitForIdle();
+  s.run(`rm -f ${dream}`);
+  // s.run(`nvim -u NONE ${dream}`);
+  // import { defineConfig, main, record } from "@letientai299/term-recorder"
+  s.run(`nvim -u NONE -c "sy on|se noai nosi ls=0" ${dream}`);
+  s.type(`i// TERM-RECORDER QUICK TUTORIAL
+import { defineConfig, main, record } from "../src"
 
-const config = defineConfig({});
+const config = defineConfig({
+  cols: 80, rows: 20,
+  shell: "zsh --no-rcs",
+  env: { PS1: "%F{green}%1~%f $ " },
+});
 
-console.log(config);
+const dream = record("dream", (s) => {
+  s.waitForIdle();
+  s.run("echo Hello from the dream!")
+  s.waitForIdle();
+})
+
+await main(config, [dream]);
 `);
 
   s.key("Escape");
   s.run(":wq");
 
   s.waitForIdle();
-  s.run(`cat ${dream}`);
+  s.run(`bun ${dream}`);
   s.waitForIdle();
-  // s.sleep(1000);
-  // s.run(`bun ${dream}`);
-  // s.sleep(1000);
 });
 
 await main(config, [inception]);

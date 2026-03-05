@@ -170,7 +170,8 @@ with a minimal prompt:
 
 ```ts
 const config = defineConfig({
-  shell: "zsh -c 'PS1=\"%F{cyan}%~%f $ \" exec zsh --no-rcs'",
+  shell: "exec zsh --no-rcs",
+  env: { PS1: "%F{cyan}%~%f\n$ " },
 });
 ```
 

@@ -13,7 +13,7 @@ produce [asciicast][asciicast] files you can play back with
 ## Install
 
 ```sh
-npm install term-recorder
+npm install @letientai299/term-recorder
 ```
 
 ## Quick start
@@ -21,7 +21,7 @@ npm install term-recorder
 Create a script file (e.g. `demos.ts`):
 
 ```ts
-import { defineConfig, main, record } from "term-recorder";
+import { defineConfig, main, record } from "@letientai299/term-recorder";
 
 const config = defineConfig();
 
@@ -157,6 +157,16 @@ Like the record tasks, `mise gif` skips when outputs are newer than inputs.
 | `mise lint`     | Type-check and lint           |
 | `mise fmt`      | Format with Prettier          |
 | `mise clean`    | Remove `casts/` and `dist/`   |
+
+### Publishing
+
+```sh
+npm version patch   # or minor, major — commits and tags automatically
+git push && git push --tags
+npm publish --access public
+```
+
+`prepublishOnly` runs `mise build` before packing, so `dist/` is always fresh.
 
 ## Limitations
 

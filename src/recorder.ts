@@ -1,7 +1,7 @@
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, watch } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { killSession } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import { DEFAULT_COLS, DEFAULT_ROWS, type RecordOptions } from "./types.ts";
@@ -26,15 +26,44 @@ function asciinemaEnv(loadConf: boolean): {
   return { env: { ASCIINEMA_CONFIG_HOME: dir }, dir };
 }
 
-/** Poll until the cast file exists on disk (proves asciinema wrote its header). */
+/**
+ * Wait until the cast file exists on disk (proves asciinema wrote its header).
+ * Uses fs.watch for instant notification with a stat-poll fallback — kqueue
+ * on macOS doesn't always deliver events for files created by child processes
+ * in temp directories.
+ */
 async function waitForCastFile(path: string, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!existsSync(path)) {
-    if (Date.now() >= deadline) {
-      throw new Error(`asciinema did not create ${path} within ${timeoutMs}ms`);
-    }
-    await new Promise<void>((r) => setTimeout(r, 50));
-  }
+  if (existsSync(path)) return;
+  const dir = dirname(path);
+  const name = basename(path);
+  await new Promise<void>((ok, fail) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      clearInterval(poll);
+      watcher.close();
+      ok();
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poll);
+      watcher.close();
+      fail(new Error(`asciinema did not create ${path} within ${timeoutMs}ms`));
+    }, timeoutMs);
+    const watcher = watch(dir, (_, filename) => {
+      if (filename === name && existsSync(path)) done();
+    });
+    watcher.on("error", () => {
+      // Swallow — stat-poll fallback still active
+    });
+    // Stat-poll fallback for platforms where fs.watch misses events
+    const poll = setInterval(() => {
+      if (existsSync(path)) done();
+    }, 200);
+  });
 }
 
 /** Shell-escape a value for embedding in a single-quoted string. */

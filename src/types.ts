@@ -55,6 +55,7 @@ export interface ActionDefs {
   waitForPrompt: { pane: string; prompt?: string; timeout?: number };
   detectPrompt: { pane: string; timeout?: number };
   waitForTitle: { pane: string; title: string; timeout?: number };
+  waitForIdle: { pane: string; timeout?: number };
   pace: { pane: string; ms: number };
   splitH: { session: string; percent?: number; placeholder?: string };
   splitV: { session: string; percent?: number; placeholder?: string };
@@ -132,6 +133,13 @@ export interface Pane {
    * @param timeout - Max wait time in ms. Default: 5 000.
    */
   waitForTitle(title: string, timeout?: number): Pane;
+  /**
+   * Block until the pane becomes idle: waits for the foreground command to change
+   * or output to arrive, then waits for output silence (500ms of no activity).
+   * Useful for apps that are slow to start or shut down.
+   * @param timeout - Max wait time in ms. Default: 10 000.
+   */
+  waitForIdle(timeout?: number): Pane;
   /** Type text and press Enter. Shorthand for `.type(text).enter()`. */
   run(text: string): Pane;
   /** Type text, press Enter, then wait for the detected prompt to reappear. Requires a prior `detectPrompt()`. */

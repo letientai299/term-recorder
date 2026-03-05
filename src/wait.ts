@@ -118,6 +118,73 @@ export async function waitForPrompt(
   );
 }
 
+/**
+ * Wait until the pane becomes idle: detects a command change or output,
+ * then waits for output silence ({@link FALLBACK_POLL_MS}).
+ */
+export async function waitForIdle(
+  server: TmuxServer,
+  target: string,
+  timeout = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+
+  // Snapshot current foreground command
+  const initialCmd = (
+    await server.tmux(
+      "display-message",
+      "-t",
+      target,
+      "-p",
+      "#{pane_current_command}",
+    )
+  ).trim();
+
+  // Phase 1: wait for any change (output or command change)
+  let changed = false;
+  while (Date.now() < deadline) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+
+    // Check command change
+    const currentCmd = (
+      await server.tmux(
+        "display-message",
+        "-t",
+        target,
+        "-p",
+        "#{pane_current_command}",
+      )
+    ).trim();
+    if (currentCmd !== initialCmd) {
+      changed = true;
+      break;
+    }
+
+    // Listen for output with a short timeout to recheck command
+    const before = Date.now();
+    await waitForOutputHint(server, Math.min(200, remaining));
+    // If resolved faster than the timeout, output arrived
+    if (Date.now() - before < 190) {
+      changed = true;
+      break;
+    }
+  }
+
+  if (!changed) {
+    throw new Error(`waitForIdle timed out after ${timeout}ms on ${target}`);
+  }
+
+  // Phase 2: wait for output silence
+  const silenceRemaining = Math.max(
+    0,
+    Math.min(FALLBACK_POLL_MS, deadline - Date.now()),
+  );
+  if (silenceRemaining > 0) {
+    await waitForOutputSilence(server, silenceRemaining);
+  }
+}
+
 let subscriptionCounter = 0;
 
 /**

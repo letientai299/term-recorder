@@ -5,6 +5,7 @@ import type { TmuxServer } from "./shell.ts";
 import type { Action, ActionKind, ActionOf, Pane, Session } from "./types.ts";
 import {
   detectPrompt,
+  waitForIdle,
   waitForPrompt,
   waitForText,
   waitForTitle,
@@ -51,7 +52,11 @@ export class ActionQueue {
       if (!action) break;
       await this.execute(action);
       // Auto-pause between actions (skip for sleep and pace)
-      if (action.kind !== "sleep" && action.kind !== "pace") {
+      if (
+        action.kind !== "sleep" &&
+        action.kind !== "pace" &&
+        action.kind !== "waitForIdle"
+      ) {
         const pane = "pane" in action ? action.pane : undefined;
         const paceMs = pane ? (this.paces.get(pane) ?? this.cfg.pace) : 0;
         const delay = Math.max(this.cfg.actionDelay, paceMs);
@@ -116,6 +121,9 @@ export class ActionQueue {
     },
     waitForTitle: async (a) => {
       await waitForTitle(this.server, a.pane, a.title, a.timeout);
+    },
+    waitForIdle: async (a) => {
+      await waitForIdle(this.server, a.pane, a.timeout);
     },
     splitV: async (a) => {
       const id = await splitPane(this.server, a.session, "v", a.percent);
@@ -194,6 +202,10 @@ export function createPaneProxy(queue: ActionQueue, target: string): Pane {
     },
     waitForTitle(title: string, timeout?: number) {
       queue.push({ kind: "waitForTitle", pane: target, title, timeout });
+      return api;
+    },
+    waitForIdle(timeout?: number) {
+      queue.push({ kind: "waitForIdle", pane: target, timeout });
       return api;
     },
     run(text: string) {

@@ -52,12 +52,8 @@ export function buildAsciinemaCmd(
   const tmuxFlags = server.userConf ? "" : "-f /dev/null ";
   const attachCmd = `tmux -L ${sq(server.socketName)} ${tmuxFlags}attach -t ${sq(mainSession)}`;
   const headlessFlag = opts?.headless ? " --headless" : "";
-  // In headful mode, add 1 to each dimension so the asciinema PTY is larger
-  // than the tmux window — tmux draws a line border in the 1-char gap.
-  // In headless mode, use the exact size for precise cast dimensions.
-  const pad = opts?.headless ? 0 : 1;
-  const wCols = (opts?.cols ?? DEFAULT_COLS) + pad;
-  const wRows = (opts?.rows ?? DEFAULT_ROWS) + pad;
+  const wCols = opts?.cols ?? DEFAULT_COLS;
+  const wRows = opts?.rows ?? DEFAULT_ROWS;
   const sizeFlag = ` --window-size ${wCols}x${wRows}`;
   return `asciinema rec --overwrite${headlessFlag}${sizeFlag} -c ${sq(attachCmd)} ${sq(absCast)}`;
 }

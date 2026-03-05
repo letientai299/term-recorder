@@ -96,8 +96,12 @@ flowchart TD
 - **Clean environment by default.** `tmux -f /dev/null` and a temp
   `ASCIINEMA_CONFIG_HOME` prevent user config from affecting reproducibility.
 - **Headful vs headless.** Headful mode runs asciinema in the foreground
-  terminal (sequential only). Headless mode uses `asciinema rec --headless` and
-  auto-parallelizes to `cpus / 2`.
+  terminal (sequential only). The tmux window is 1 smaller in each dimension so
+  tmux draws a visible border within the cast frame. Headless mode uses
+  `asciinema rec --headless`, auto-parallelizes to `cpus / 2`, and produces
+  borderless output. Both modes produce casts at the configured dimensions, but
+  usable area differs: `--cols 120 --rows 30` gives scripts 120×30 in headless
+  and 119×29 in headful.
 
 ## Tips
 
@@ -208,8 +212,6 @@ npm publish --access public
   host system. Contributors can use `mise install` to get both automatically.
 - **asciicast only.** Outputs `.cast` files. Convert with [agg][agg],
   [svg-term][svg-term], or similar post-processing tools.
-- **Fixed terminal size.** Sessions start at 100×40. The dimensions are not
-  configurable.
 - **Headful mode is sequential.** Concurrency is locked to 1 because asciinema
   occupies the foreground terminal.
 - **200-line scrollback capture.** `capturePane` fetches the last 200 lines.

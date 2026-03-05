@@ -15,13 +15,13 @@ describe("buildAsciinemaCmd", () => {
     expect(cmd).toContain("--headless");
   });
 
-  test("headful pads cols/rows by 1", () => {
+  test("headful uses exact cols/rows (no padding)", () => {
     const cmd = buildAsciinemaCmd(server, "sess", "/tmp/out.cast", {
       headless: false,
       cols: 80,
       rows: 24,
     });
-    expect(cmd).toContain("--window-size 81x25");
+    expect(cmd).toContain("--window-size 80x24");
     expect(cmd).not.toContain("--headless");
   });
 
@@ -34,7 +34,7 @@ describe("buildAsciinemaCmd", () => {
     const headful = buildAsciinemaCmd(server, "sess", "/tmp/out.cast", {
       headless: false,
     });
-    expect(headful).toContain("--window-size 121x31");
+    expect(headful).toContain("--window-size 120x30");
   });
 
   test("always includes --window-size", () => {

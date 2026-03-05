@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+<defs><filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="100" height="100" rx="16" fill="#1a1a1a"/>
+<g transform="translate(50,50) scale(1.5) translate(-53,-49)">
+    <path d="M32.54,38.36 L44.18,50 L32.54,61.64" fill="none" stroke="#d8e4f0" stroke-width="3.75" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="48.06" y="44.18" width="3.395" height="11.64" rx="1.164" fill="#d8e4f0" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;0.15;0.7" dur="1.2s" repeatCount="indefinite"/>
+    </rect>
+    <line x1="54.849999999999994" y1="47.09" x2="71.34" y2="47.09" stroke="#d8e4f0" stroke-width="1.75" opacity="0.2" stroke-linecap="round"/>
+    <line x1="54.849999999999994" y1="52.91" x2="65.52" y2="52.91" stroke="#d8e4f0" stroke-width="1.75" opacity="0.12" stroke-linecap="round"/>
+    <circle cx="65.52" cy="36.42" r="5.82" fill="none" stroke="#ff3b3b" stroke-width="2.25" opacity="0.5" filter="url(#gl)"/>
+    <circle cx="65.52" cy="36.42" r="2.91" fill="#ff3b3b" filter="url(#gl)"/>
+    <text x="73.28" y="38.36" font-family="monospace" font-size="4.365" fill="#ff3b3b" opacity="0.7" font-weight="bold">REC</text>
+    <line x1="30.6" y1="67.46000000000001" x2="69.4" y2="67.46000000000001" stroke="#d8e4f0" stroke-width="1" opacity="0.15"/>
+    <circle cx="33.510000000000005" cy="67.46000000000001" r="1.3579999999999999" fill="#ff3b3b" opacity="0.5"/>
+    <line x1="36.42" y1="67.46000000000001" x2="48.06" y2="67.46000000000001" stroke="#d8e4f0" stroke-width="1.25" opacity="0.2" stroke-linecap="round"/>
+  </g>
+</svg>

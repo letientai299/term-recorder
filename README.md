@@ -1,5 +1,7 @@
 # term-recorder
 
+<img src="docs/logo.svg" width="64" height="64" alt="" align="left" />
+
 Scriptable terminal recordings. Write TypeScript to drive tmux sessions and
 produce [asciicast][asciicast] files you can play back with
 [asciinema][asciinema] or embed on the web.

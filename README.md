@@ -99,6 +99,40 @@ flowchart TD
   terminal (sequential only). Headless mode uses `asciinema rec --headless` and
   auto-parallelizes to `cpus / 2`.
 
+## Tips
+
+### Clean shell prompt for demos
+
+Your personal shell prompt (starship, oh-my-zsh, etc.) can leak personal info
+and distract from the demo content. Use `shell` and `env` to start a bare zsh
+with a minimal prompt:
+
+```ts
+const config = defineConfig({
+  shell: "zsh -c 'PS1=\"%F{cyan}%~%f $ \" exec zsh --no-rcs'",
+});
+```
+
+`--no-rcs` skips all zsh startup files so nothing overrides the prompt. `%~`
+shows the full path from home, `%F{cyan}` adds color. The two `zsh` invocations
+are intentional: the outer one runs `-c` to set `PS1`, then `exec zsh --no-rcs`
+replaces it with an interactive shell that inherits the variable.
+
+### Session-level environment variables
+
+Use `env` to set environment variables visible to all panes (including splits):
+
+```ts
+const config = defineConfig({
+  env: { EDITOR: "vim", TERM: "xterm-256color" },
+});
+```
+
+Variables set via `env` are applied at the tmux session level, so every pane
+inherits them automatically. This is useful for controlling tool behavior
+(`EDITOR`, `PAGER`), ensuring color support (`TERM`, `COLORTERM`), or hiding
+personal details (`HOME`, `USER`).
+
 ## Development
 
 [mise][mise] manages all dev tools. After cloning:

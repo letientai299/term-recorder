@@ -6,22 +6,28 @@ const DEFAULT_TIMEOUT = 5_000;
 /** Slow fallback interval when no %output hint arrives. */
 const FALLBACK_POLL_MS = 500;
 
+/** Debounce window — collapses rapid %output bursts into one wakeup. */
+const OUTPUT_DEBOUNCE_MS = 15;
+
 /**
  * Wait for `%output` or a timeout — whichever comes first.
- * Returns immediately when the server emits an output notification,
- * allowing the caller to re-check a predicate without blind polling.
+ * Debounces rapid output bursts so the caller doesn't issue a
+ * capture-pane RPC for every notification during heavy output.
  */
 function waitForOutputHint(server: TmuxServer, ms: number): Promise<void> {
   return new Promise<void>((resolve) => {
-    const timer = setTimeout(() => {
-      server.offOutput(cb);
-      resolve();
-    }, ms);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    const fallback = setTimeout(done, ms);
     const cb = () => {
-      clearTimeout(timer);
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(done, OUTPUT_DEBOUNCE_MS);
+    };
+    function done() {
+      clearTimeout(fallback);
+      if (debounce) clearTimeout(debounce);
       server.offOutput(cb);
       resolve();
-    };
+    }
     server.onOutput(cb);
   });
 }

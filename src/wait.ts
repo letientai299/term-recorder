@@ -164,9 +164,10 @@ export async function waitForIdle(
   const deadline = Date.now() + timeout;
 
   // Phase 1: wait for any change (output or command change).
-  // Use a subscription for push-based command-change detection instead of
-  // polling display-message every iteration.
+  // Register the callback *before* subscribe() sends the tmux command so
+  // no %subscription-changed notification can slip through the gap.
   const subName = `tr-idle-${process.pid}-${++subscriptionCounter}`;
+  const subReady = server.waitForSubscription(subName, () => true, timeout);
   await server.subscribe(subName, target, "#{pane_current_command}");
 
   let changed = false;
@@ -178,11 +179,9 @@ export async function waitForIdle(
 
     // Race: subscription fires on command change, output hint fires on output
     await Promise.race([
-      server
-        .waitForSubscription(subName, () => true, remaining)
-        .then(() => {
-          changed = true;
-        }),
+      subReady.then(() => {
+        changed = true;
+      }),
       waitForOutputHint(server, remaining).then(() => {
         changed = true;
       }),

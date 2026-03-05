@@ -93,8 +93,9 @@ flowchart TD
   a persistent control mode connection instead of spawning individual `tmux`
   processes. This is faster and enables push-based `%output` notifications for
   efficient waiting.
-- **Clean environment by default.** `tmux -f /dev/null` and a temp
-  `ASCIINEMA_CONFIG_HOME` prevent user config from affecting reproducibility.
+- **Clean tmux by default.** `tmux -f /dev/null` prevents user config from
+  affecting reproducibility. Pass `--load-tmux-conf` to use your own theme and
+  status bar.
 - **Headful vs headless.** Headful mode runs asciinema in the foreground
   terminal (sequential only). The tmux window is 1 smaller in each dimension so
   tmux draws a visible border within the cast frame. Headless mode uses

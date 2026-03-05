@@ -1,29 +1,12 @@
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, watch } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, watch } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { killSession } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
 import { DEFAULT_COLS, DEFAULT_ROWS, type RecordOptions } from "./types.ts";
 
 export interface RecordingHandle {
   asciinemaProc?: import("node:child_process").ChildProcess;
-  /** Temp dir for asciinema config isolation — cleaned up on stop. */
-  ascConfigDir?: string;
-}
-
-/**
- * Build the environment for the asciinema process.
- * By default, points ASCIINEMA_CONFIG_HOME to an empty temp dir
- * so the user's asciinema config doesn't interfere.
- */
-function asciinemaEnv(loadConf: boolean): {
-  env: Record<string, string>;
-  dir?: string;
-} {
-  if (loadConf) return { env: {} };
-  const dir = mkdtempSync(join(tmpdir(), "tr-asc-"));
-  return { env: { ASCIINEMA_CONFIG_HOME: dir }, dir };
 }
 
 /**
@@ -88,30 +71,22 @@ export function buildAsciinemaCmd(
 }
 
 async function startHeadful(
-  _server: TmuxServer,
-  _mainSession: string,
   absCast: string,
   cmd: string,
-  env: Record<string, string>,
 ): Promise<RecordingHandle["asciinemaProc"]> {
   const proc = spawn("sh", ["-c", cmd], {
     stdio: ["inherit", "inherit", "inherit"],
-    env: { ...process.env, ...env },
   });
   await waitForCastFile(absCast, 10_000);
   return proc;
 }
 
 async function startHeadless(
-  _server: TmuxServer,
-  _mainSession: string,
   absCast: string,
   cmd: string,
-  env: Record<string, string>,
 ): Promise<RecordingHandle["asciinemaProc"]> {
   const proc = spawn("sh", ["-c", cmd], {
     stdio: "ignore",
-    env: { ...process.env, ...env },
   });
   await waitForCastFile(absCast, 10_000);
   return proc;
@@ -125,37 +100,21 @@ export async function startRecording(
   server: TmuxServer,
   mainSession: string,
   castFile: string,
-  opts?: Pick<RecordOptions, "mode" | "cols" | "rows" | "loadAsciinemaConf">,
+  opts?: Pick<RecordOptions, "mode" | "cols" | "rows">,
 ): Promise<RecordingHandle> {
   const mode = opts?.mode ?? "headful";
   const headless = mode === "headless";
   const absCast = resolve(castFile);
-  const asc = asciinemaEnv(opts?.loadAsciinemaConf ?? false);
   const cmd = buildAsciinemaCmd(server, mainSession, absCast, {
     headless,
     cols: opts?.cols,
     rows: opts?.rows,
   });
 
-  let asciinemaProc: RecordingHandle["asciinemaProc"];
-  if (headless) {
-    asciinemaProc = await startHeadless(
-      server,
-      mainSession,
-      absCast,
-      cmd,
-      asc.env,
-    );
-  } else {
-    asciinemaProc = await startHeadful(
-      server,
-      mainSession,
-      absCast,
-      cmd,
-      asc.env,
-    );
-  }
-  return { asciinemaProc, ascConfigDir: asc.dir };
+  const asciinemaProc = headless
+    ? await startHeadless(absCast, cmd)
+    : await startHeadful(absCast, cmd);
+  return { asciinemaProc };
 }
 
 /**
@@ -190,14 +149,6 @@ export async function stopRecording(
       } catch {
         // Best-effort — may fail if stdin isn't a tty (headless)
       }
-    }
-  }
-
-  if (handle?.ascConfigDir) {
-    try {
-      rmSync(handle.ascConfigDir, { recursive: true });
-    } catch {
-      // Ignore — temp dir may already be gone
     }
   }
 }

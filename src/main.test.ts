@@ -12,7 +12,6 @@ describe("parseCliFlags", () => {
     expect(flags.cols).toBeUndefined();
     expect(flags.rows).toBeUndefined();
     expect(flags.loadTmuxConf).toBe(false);
-    expect(flags.loadAsciinemaConf).toBe(false);
     expect(flags.dryRun).toBe(false);
   });
 
@@ -36,10 +35,9 @@ describe("parseCliFlags", () => {
     expect(flags[field]).toBe(expected);
   });
 
-  test("--load-tmux-conf and --load-asciinema-conf", () => {
-    const flags = parseCliFlags(["--load-tmux-conf", "--load-asciinema-conf"]);
+  test("--load-tmux-conf", () => {
+    const flags = parseCliFlags(["--load-tmux-conf"]);
     expect(flags.loadTmuxConf).toBe(true);
-    expect(flags.loadAsciinemaConf).toBe(true);
   });
 
   test("combined flags", () => {
@@ -83,7 +81,6 @@ describe("resolveOptions", () => {
     const opts = resolveOptions({}, defaultCli);
     expect(opts.mode).toBe("headful");
     expect(opts.loadTmuxConf).toBe(false);
-    expect(opts.loadAsciinemaConf).toBe(false);
   });
 
   test("--headless CLI flag overrides config mode", () => {

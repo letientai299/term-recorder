@@ -17,7 +17,6 @@ interface CliFlags {
   cols?: number;
   rows?: number;
   loadTmuxConf: boolean;
-  loadAsciinemaConf: boolean;
   dryRun: boolean;
   trailingDelay?: number;
   pace?: number;
@@ -69,11 +68,6 @@ const argsDef = {
   "load-tmux-conf": {
     type: "boolean",
     description: "Use your tmux.conf instead of a clean config",
-    default: false,
-  },
-  "load-asciinema-conf": {
-    type: "boolean",
-    description: "Use your asciinema config instead of defaults",
     default: false,
   },
   "dry-run": {
@@ -143,7 +137,6 @@ export function parseCliFlags(argv: string[]): CliFlags {
     cols: parseIntOpt(parsed.cols),
     rows: parseIntOpt(parsed.rows),
     loadTmuxConf: parsed["load-tmux-conf"] ?? false,
-    loadAsciinemaConf: parsed["load-asciinema-conf"] ?? false,
     dryRun: parsed["dry-run"] ?? false,
     trailingDelay: parseIntOpt(parsed["trailing-delay"], 0),
     pace: parseIntOpt(parsed.pace, 0),
@@ -160,7 +153,6 @@ export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
     ...(cli.cols != null ? { cols: cli.cols } : undefined),
     ...(cli.rows != null ? { rows: cli.rows } : undefined),
     ...(cli.loadTmuxConf ? { loadTmuxConf: true } : undefined),
-    ...(cli.loadAsciinemaConf ? { loadAsciinemaConf: true } : undefined),
     ...(cli.trailingDelay != null
       ? { trailingDelay: cli.trailingDelay }
       : undefined),
@@ -172,7 +164,6 @@ export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
     ...base,
     mode: config.mode ?? "headful",
     loadTmuxConf: config.loadTmuxConf ?? false,
-    loadAsciinemaConf: config.loadAsciinemaConf ?? false,
     ...cliOverrides,
   };
 }

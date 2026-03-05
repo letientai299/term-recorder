@@ -36,8 +36,6 @@ export interface RecordOptions {
   actionDelay?: number;
   /** Load user's `tmux.conf`. Default: false (clean tmux with no user config). */
   loadTmuxConf?: boolean;
-  /** Load user's asciinema config. Default: false. */
-  loadAsciinemaConf?: boolean;
   /** Extra tmux options applied via `set-option`. */
   tmux?: { options?: Record<string, string> };
   /** Environment variables set in the tmux session. */

@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { ActionQueue, createSessionProxy, type QueueConfig } from "./queue.ts";
 import { startRecording, stopRecording } from "./recorder.ts";
+import type { RecordScript } from "./recording.ts";
 import { createSession } from "./session.ts";
 import { TmuxServer } from "./shell.ts";
 import {
@@ -10,6 +11,7 @@ import {
   DEFAULT_TRAILING_DELAY_MS,
   DEFAULT_TYPING_DELAY_MS,
   type RecordOptions,
+  type RunnerConfig,
   type Session,
 } from "./types.ts";
 
@@ -34,7 +36,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export async function executeRecording(
   castFile: string,
   opts: RecordOptions,
-  script: (s: Session) => void | Promise<void>,
+  script: RecordScript,
   server?: TmuxServer,
 ): Promise<void> {
   const name = opts.sessionName ?? `rec-${Date.now()}`;
@@ -52,15 +54,40 @@ export async function executeRecording(
     await srv.connect(name);
     recording = await startRecording(srv, name, castFile, opts);
 
+    const mode = opts.mode ?? "headful";
+    const typingDelay = Math.max(
+      0,
+      opts.typingDelay ?? DEFAULT_TYPING_DELAY_MS,
+    );
+    const actionDelay = Math.max(
+      0,
+      opts.actionDelay ?? DEFAULT_ACTION_DELAY_MS,
+    );
+    const pace = Math.max(0, opts.pace ?? DEFAULT_PACE_MS);
+    const trailing = Math.max(
+      0,
+      opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS,
+    );
+
     const queueCfg: QueueConfig = {
-      typingDelay: Math.max(0, opts.typingDelay ?? DEFAULT_TYPING_DELAY_MS),
-      actionDelay: Math.max(0, opts.actionDelay ?? DEFAULT_ACTION_DELAY_MS),
-      headless: (opts.mode ?? "headful") === "headless",
-      pace: Math.max(0, opts.pace ?? DEFAULT_PACE_MS),
+      typingDelay,
+      actionDelay,
+      headless: mode === "headless",
+      pace,
     };
     const queue = new ActionQueue(srv, queueCfg);
     const session = createSessionProxy(queue, name);
-    const result = script(session);
+
+    const runnerCfg: RunnerConfig = {
+      mode,
+      cols: opts.cols ?? 100,
+      rows: opts.rows ?? 40,
+      typingDelay,
+      actionDelay,
+      trailingDelay: trailing,
+      pace,
+    };
+    const result = script(session, runnerCfg);
     if (result && typeof result.then === "function") {
       await result;
     }
@@ -68,10 +95,6 @@ export async function executeRecording(
 
     // Keep the session alive so asciinema records idle time for the last frame.
     // The 50ms base covers asciinema's ~25ms capture interval.
-    const trailing = Math.max(
-      0,
-      opts.trailingDelay ?? DEFAULT_TRAILING_DELAY_MS,
-    );
     await sleep(50 + trailing);
   } finally {
     await srv.disconnect();

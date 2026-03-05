@@ -77,6 +77,21 @@ export type Action = {
 export type ActionOf<K extends ActionKind> = Extract<Action, { kind: K }>;
 
 /**
+ * Resolved configuration passed to {@link record} callbacks.
+ * All values are concrete (defaults applied) so scripts can use them
+ * without null checks.
+ */
+export interface RunnerConfig {
+  readonly mode: "headful" | "headless";
+  readonly cols: number;
+  readonly rows: number;
+  readonly typingDelay: number;
+  readonly actionDelay: number;
+  readonly trailingDelay: number;
+  readonly pace: number;
+}
+
+/**
  * Actions available on a single tmux pane. All methods are chainable
  * and queue actions for later execution — nothing runs until {@link main}
  * drains the queue.

@@ -1,16 +1,8 @@
 import { defineConfig, main, record } from "../src";
-import { parseCliFlags } from "../src/main.ts";
-
-const DEFAULT_COLS = 60;
-const DEFAULT_ROWS = 20;
-
-const cli = parseCliFlags(process.argv.slice(2));
-const cols = cli.cols ?? DEFAULT_COLS;
-const rows = cli.rows ?? DEFAULT_ROWS;
 
 const config = defineConfig({
-  cols,
-  rows,
+  cols: 60,
+  rows: 20,
   typingDelay: 0,
   actionDelay: 0,
   pace: 0,
@@ -98,13 +90,13 @@ function rulerCmd(c: number, r: number): string {
   return `printf '%s\\n' ${allButLast} && printf '%s' '${last}'`;
 }
 
-const ruler = record("ruler", (s) => {
-  const cmd = rulerCmd(cols, rows);
+const ruler = record("ruler", (s, cfg) => {
+  const cmd = rulerCmd(cfg.cols, cfg.rows);
   s.detectPrompt();
   s.send(`cat > /tmp/ruler.sh << 'RULER'\n${cmd}\nRULER\n`);
   s.waitForPrompt();
   s.send("clear && sh /tmp/ruler.sh && exec cat\n");
-  s.waitForText(String(rows));
+  s.waitForText(String(cfg.rows));
 });
 
 await main(config, [ruler]);

@@ -140,6 +140,9 @@ export class TmuxServer {
     inBlock: boolean;
   };
 
+  /** PID of the tmux server process, cached after first query. */
+  serverPid?: number;
+
   /**
    * @param socketName - Unique tmux socket name (passed as `tmux -L <name>`).
    * @param userConf - When true, load the user's `tmux.conf`. When false (default),

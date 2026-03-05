@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import type { ArgsDef } from "citty";
@@ -188,6 +189,44 @@ interface RecordingResult {
   error?: Error;
 }
 
+/**
+ * Servers tracked for signal-based cleanup.
+ *
+ * When this process is killed by a parent (e.g. SIGHUP from a parent tmux
+ * session tearing down), async finally blocks won't run. The signal handler
+ * synchronously kills any active tmux servers so they don't leak.
+ */
+const activeServers = new Set<TmuxServer>();
+let signalCleanupInstalled = false;
+
+function installSignalCleanup(): void {
+  if (signalCleanupInstalled) return;
+  signalCleanupInstalled = true;
+
+  // Only SIGHUP — sent by tmux when a parent session tears down the pane.
+  // SIGINT/SIGTERM are left to the normal graceful teardown in executeRecording
+  // (disconnect → stopRecording → SIGTERM/SIGKILL asciinema → terminal reset).
+  process.on("SIGHUP", () => {
+    for (const srv of activeServers) {
+      if (srv.serverPid != null) {
+        try {
+          process.kill(srv.serverPid, "SIGTERM");
+        } catch {
+          // Server may already be dead
+        }
+      }
+    }
+    // Best-effort tty restore — asciinema may have left it in raw/no-echo mode.
+    // No-op when the parent pane is already gone (ENXIO).
+    try {
+      execFileSync("stty", ["sane"], { stdio: "inherit" });
+    } catch {
+      // stdin may not be a tty (headless, or parent pane already dead)
+    }
+    process.exit(129);
+  });
+}
+
 async function runOne(
   rec: Recording,
   opts: RecordOptions,
@@ -198,6 +237,7 @@ async function runOne(
     `tr-${rec.name}-${Date.now()}`,
     opts.loadTmuxConf ?? false,
   );
+  activeServers.add(server);
   const start = Date.now();
   try {
     await executeRecording(castFile, opts, rec.script, server);
@@ -210,6 +250,7 @@ async function runOne(
     };
   } finally {
     await server.destroy();
+    activeServers.delete(server);
   }
 }
 
@@ -325,6 +366,8 @@ export async function main(
     }
     return;
   }
+
+  installSignalCleanup();
 
   const opts = resolveOptions(config, cli);
   const concurrency =

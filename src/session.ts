@@ -48,6 +48,12 @@ export async function createSession(
   await server.tmux("set-option", "-t", name, "-w", "window-size", "manual");
   await server.tmux("resize-window", "-t", name, "-x", cols, "-y", rows);
 
+  // Cache the server PID for signal-based cleanup (see main.ts).
+  if (server.serverPid == null) {
+    const pid = await server.tmux("display-message", "-p", "#{pid}");
+    server.serverPid = Number(pid);
+  }
+
   if (opts?.tmux?.options) {
     for (const [key, value] of Object.entries(opts.tmux.options)) {
       await server.tmux("set-option", "-t", name, key, value);

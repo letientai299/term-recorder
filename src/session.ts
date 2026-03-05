@@ -13,6 +13,12 @@ export async function createSession(
   const rows = String(opts?.rows ?? DEFAULT_ROWS);
   const args = ["new-session", "-d", "-s", name, "-x", cols, "-y", rows];
   if (opts?.cwd) args.push("-c", opts.cwd);
+  // Pass env vars via -e so all panes inherit them (tmux 3.2+).
+  if (opts?.env) {
+    for (const [key, value] of Object.entries(opts.env)) {
+      args.push("-e", `${key}=${value}`);
+    }
+  }
   // shell-command must be last — runs in the initial pane
   if (opts?.shell) args.push(opts.shell);
   await server.tmux(...args);
@@ -45,12 +51,6 @@ export async function createSession(
   if (opts?.tmux?.options) {
     for (const [key, value] of Object.entries(opts.tmux.options)) {
       await server.tmux("set-option", "-t", name, key, value);
-    }
-  }
-
-  if (opts?.env) {
-    for (const [key, value] of Object.entries(opts.env)) {
-      await server.tmux("set-environment", "-t", name, key, value);
     }
   }
 }

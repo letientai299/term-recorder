@@ -62,6 +62,17 @@ export async function capturePane(
 }
 
 /**
+ * Resolve a tmux target (session:window.pane name) to the internal pane ID
+ * (e.g. `%0`). Used to filter %output notifications by pane.
+ */
+export async function getPaneId(
+  server: TmuxServer,
+  target: string,
+): Promise<string> {
+  return server.tmux("display-message", "-t", target, "-p", "#{pane_id}");
+}
+
+/**
  * Get the pane title set by the running program via ANSI escape sequences.
  */
 export async function getPaneTitle(

@@ -1,4 +1,4 @@
-import { capturePane, getPaneTitle, sendKeys } from "./pane.ts";
+import { capturePane, getPaneId, getPaneTitle, sendKeys } from "./pane.ts";
 import type { TmuxServer } from "./shell.ts";
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -13,12 +13,20 @@ const OUTPUT_DEBOUNCE_MS = 15;
  * Wait for `%output` or a timeout — whichever comes first.
  * Debounces rapid output bursts so the caller doesn't issue a
  * capture-pane RPC for every notification during heavy output.
+ *
+ * When `paneId` is provided, only output on that specific pane triggers
+ * a wakeup — prevents spurious checks in multi-pane recordings.
  */
-function waitForOutputHint(server: TmuxServer, ms: number): Promise<void> {
+function waitForOutputHint(
+  server: TmuxServer,
+  ms: number,
+  paneId?: string,
+): Promise<void> {
   return new Promise<void>((resolve) => {
     let debounce: ReturnType<typeof setTimeout> | undefined;
     const fallback = setTimeout(done, ms);
-    const cb = () => {
+    const cb = (id: string) => {
+      if (paneId && id !== paneId) return;
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(done, OUTPUT_DEBOUNCE_MS);
     };
@@ -70,6 +78,13 @@ export async function pollPane(
   opts?: { suppressErrors?: boolean; fetch?: () => Promise<string> },
 ): Promise<void> {
   const getData = opts?.fetch ?? (() => capturePane(server, target));
+  // Resolve pane ID once for filtered %output listening
+  let paneId: string | undefined;
+  try {
+    paneId = await getPaneId(server, target);
+  } catch {
+    // Fall back to unfiltered if pane ID resolution fails
+  }
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     try {
@@ -80,7 +95,11 @@ export async function pollPane(
     }
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
-    await waitForOutputHint(server, Math.min(FALLBACK_POLL_MS, remaining));
+    await waitForOutputHint(
+      server,
+      Math.min(FALLBACK_POLL_MS, remaining),
+      paneId,
+    );
   }
   throw new Error(`${label} timed out after ${timeout}ms on ${target}`);
 }

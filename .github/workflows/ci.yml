@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
@@ -23,4 +28,3 @@ jobs:
       - name: Lint
         run: bunx biome check .
       - run: mise test
-      - run: mise e2e

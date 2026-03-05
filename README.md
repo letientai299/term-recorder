@@ -1,10 +1,12 @@
-# term-recorder
+# `term-recorder` [![CI][ci-badge]][ci] [![npm][npm-badge]][npm]
 
 <img src="docs/logo.svg" width="64" height="64" alt="" align="left" />
 
 Scriptable terminal recordings. Write TypeScript to drive tmux sessions and
-produce [asciicast][asciicast] files you can play back with
-[asciinema][asciinema] or embed on the web.
+produce [asciicast][] files you can play back with [asciinema][] or embed on the
+web. Below is a demo of `term-recorder` [recording itself][inception].
+
+![Inception](docs/inception.gif)
 
 ## Requirements
 
@@ -228,6 +230,10 @@ See [docs/contributing.md](docs/contributing.md).
 - **Serialized tmux commands.** The control mode mutex means no two tmux
   commands run simultaneously, even across different panes. Multi-pane scripts
   are sequential at the I/O layer.
+- **Polling-based wait APIs.** `waitForText`, `waitForPrompt`, and `waitForIdle`
+  poll `capture-pane` snapshots. Text that appears and disappears between polls
+  can be missed, and `waitForIdle` uses a short silence heuristic that may
+  resolve too early under bursty output.
 
 [agg]: https://github.com/asciinema/agg
 [ffmpeg]: https://ffmpeg.org
@@ -239,3 +245,9 @@ See [docs/contributing.md](docs/contributing.md).
 [tmux-cc]: https://github.com/tmux/tmux/wiki/Control-Mode
 [tmux-install]: https://github.com/tmux/tmux/wiki/Installing
 [asciinema-install]: https://docs.asciinema.org/manual/cli/installation/
+[inception]: ./examples/inception.ts
+[ci-badge]:
+  https://github.com/letientai299/term-recorder/actions/workflows/ci.yml/badge.svg
+[ci]: https://github.com/letientai299/term-recorder/actions/workflows/ci.yml
+[npm-badge]: https://img.shields.io/npm/v/@letientai299/term-recorder
+[npm]: https://www.npmjs.com/package/@letientai299/term-recorder

@@ -39,7 +39,10 @@ export function parseCast(path: string): CastFile {
   const firstLine = lines[0];
   if (!firstLine) throw new Error("Empty cast file");
   const header = JSON.parse(firstLine) as CastHeader;
-  const events = lines.slice(1).map((line) => JSON.parse(line) as CastEvent);
+  const events = lines
+    .slice(1)
+    .filter((line) => line.startsWith("["))
+    .map((line) => JSON.parse(line) as CastEvent);
   return { header, events };
 }
 

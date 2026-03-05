@@ -138,13 +138,20 @@ export async function executeRecording(
     await stopRecording(srv, name, recording);
     appendResetFrame(castFile);
     // Headful asciinema inherits stdio and tmux enters alternate screen,
-    // sets a scroll region, and may hide the cursor. A kill-session won't
-    // cleanly undo these, so reset the host terminal:
-    //   \x1b[?1049l  exit alternate screen (restore main screen + scrollback)
-    //   \x1b[r       reset scroll region to full terminal height
-    //   \x1b[?25h    show cursor
-    //   \x1b[0m      reset text attributes
-    if (headful) process.stdout.write("\x1b[?1049l\x1b[r\x1b[?25h\x1b[0m");
+    // sets a scroll region, enables mouse/paste/focus modes, and may hide
+    // the cursor. A kill-session won't cleanly undo these, so reset the
+    // host terminal.
+    if (headful)
+      process.stdout.write(
+        "\x1b[?1049l" + // exit alternate screen
+          "\x1b[r" + // reset scroll region (DECSTBM)
+          "\x1b[?25h" + // show cursor
+          "\x1b[0m" + // reset SGR attributes
+          "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l" + // disable mouse modes
+          "\x1b[?2004l" + // disable bracketed paste
+          "\x1b[?1004l" + // disable focus events
+          "\x1b>", // normal keypad mode
+      );
     if (ownsServer) await srv.destroy();
   }
 }

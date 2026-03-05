@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -144,12 +144,24 @@ export async function stopRecording(
     const proc = handle.asciinemaProc;
     await new Promise<void>((resolve) => {
       if (proc.exitCode != null) return resolve();
+      // SIGTERM lets asciinema restore the host tty (raw mode, echo, etc.).
+      // Only SIGKILL if it doesn't exit within 5s.
+      proc.kill("SIGTERM");
       const timer = setTimeout(() => proc.kill("SIGKILL"), 5_000);
       proc.once("exit", () => {
         clearTimeout(timer);
         resolve();
       });
     });
+    // If asciinema was SIGKILLed it couldn't restore the tty. Reset it so
+    // the user's shell isn't left in raw mode with echo disabled.
+    if (handle.asciinemaProc.signalCode === "SIGKILL") {
+      try {
+        execSync("stty sane", { stdio: "inherit" });
+      } catch {
+        // Best-effort — may fail if stdin isn't a tty (headless)
+      }
+    }
   }
 
   if (handle?.ascConfigDir) {

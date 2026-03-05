@@ -74,7 +74,6 @@ export async function executeRecording(
     );
     await sleep(50 + trailing);
   } finally {
-    // Disconnect control mode before killing sessions
     await srv.disconnect();
     await stopRecording(srv, name, recording);
     if (ownsServer) await srv.destroy();

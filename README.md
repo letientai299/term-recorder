@@ -9,7 +9,7 @@ produce [asciicast][asciicast] files you can play back with
 - [Bun][bun] (runtime)
 - [tmux][tmux] 3.4+ (session management — uses control mode subscriptions and
   `capture-pane -T`)
-- [asciinema][asciinema] 2.0+ (recording — uses `rec --overwrite`)
+- [asciinema][asciinema] 3.0+ (recording — uses `rec --overwrite --headless`)
 
 ## Install
 
@@ -96,12 +96,12 @@ flowchart TD
 - **Clean environment by default.** `tmux -f /dev/null` and a temp
   `ASCIINEMA_CONFIG_HOME` prevent user config from affecting reproducibility.
 - **Headful vs headless.** Headful mode runs asciinema in the foreground
-  terminal (sequential only). Headless mode runs asciinema in a detached capture
-  session and auto-parallelizes to `cpus / 2`.
+  terminal (sequential only). Headless mode uses `asciinema rec --headless` and
+  auto-parallelizes to `cpus / 2`.
 
 ## Limitations
 
-- **External tool dependency.** Requires tmux 3.4+ and asciinema 2.0+ installed
+- **External tool dependency.** Requires tmux 3.4+ and asciinema 3.0+ installed
   on the system. No bundled or fallback implementation.
 - **asciicast only.** Outputs `.cast` files. No SVG, GIF, or MP4. Use
   post-processing tools like [agg][agg] or [svg-term][svg-term] for other

@@ -8,11 +8,13 @@ export async function createSession(
 ): Promise<void> {
   const args = ["new-session", "-d", "-s", name, "-x", "100", "-y", "40"];
   if (opts?.cwd) args.push("-c", opts.cwd);
+  // shell-command must be last — runs in the initial pane
+  if (opts?.shell) args.push(opts.shell);
   await server.tmux(...args);
 
-  // Set default shell for new panes
+  // Set default-command so split panes also use the same shell
   if (opts?.shell) {
-    await server.tmux("set-option", "-t", name, "default-shell", opts.shell);
+    await server.tmux("set-option", "-t", name, "default-command", opts.shell);
   }
 
   // Force 0-based indexing for predictable pane targeting

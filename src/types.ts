@@ -10,6 +10,12 @@ export const DEFAULT_TRAILING_DELAY_MS = 1000;
 /** Default per-pane pace delay in ms. */
 export const DEFAULT_PACE_MS = 1000;
 
+/** Default terminal columns. */
+export const DEFAULT_COLS = 120;
+
+/** Default terminal rows. */
+export const DEFAULT_ROWS = 30;
+
 /**
  * Low-level options for {@link executeRecording}.
  * Most users should use {@link Config} with {@link main} instead — `main()` resolves
@@ -18,9 +24,9 @@ export const DEFAULT_PACE_MS = 1000;
 export interface RecordOptions {
   /** `"headful"` shows tmux in a terminal; `"headless"` runs detached with logs. Default: `"headful"`. */
   mode?: "headful" | "headless";
-  /** Number of columns for the terminal window. Default: 100. */
+  /** Number of columns for the terminal window. Default: {@link DEFAULT_COLS}. */
   cols?: number;
-  /** Number of rows for the terminal window. Default: 40. */
+  /** Number of rows for the terminal window. Default: {@link DEFAULT_ROWS}. */
   rows?: number;
   /** Shell to launch inside tmux panes. Default: inherited from `$SHELL`. */
   shell?: string;

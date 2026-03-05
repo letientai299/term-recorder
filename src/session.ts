@@ -1,5 +1,5 @@
 import type { TmuxServer } from "./shell.ts";
-import type { RecordOptions } from "./types.ts";
+import { DEFAULT_COLS, DEFAULT_ROWS, type RecordOptions } from "./types.ts";
 
 export async function createSession(
   server: TmuxServer,
@@ -9,8 +9,8 @@ export async function createSession(
     "cols" | "rows" | "env" | "cwd" | "tmux" | "shell"
   >,
 ): Promise<void> {
-  const cols = String(opts?.cols ?? 100);
-  const rows = String(opts?.rows ?? 40);
+  const cols = String(opts?.cols ?? DEFAULT_COLS);
+  const rows = String(opts?.rows ?? DEFAULT_ROWS);
   const args = ["new-session", "-d", "-s", name, "-x", cols, "-y", rows];
   if (opts?.cwd) args.push("-c", opts.cwd);
   // shell-command must be last — runs in the initial pane
@@ -33,7 +33,9 @@ export async function createSession(
   }
   // Disable status bar so it doesn't eat a row or cause line-wrap issues
   await server.tmux("set-option", "-t", name, "status", "off");
-  // Prevent tmux from resizing windows to match the attaching client
+  // Prevent tmux from resizing windows to match the attaching client.
+  // tmux draws a line border around the window automatically when it is
+  // smaller than the client terminal.
   await server.tmux("set-option", "-t", name, "-w", "window-size", "manual");
   await server.tmux("resize-window", "-t", name, "-x", cols, "-y", rows);
 

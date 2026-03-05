@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { killSession } from "./session.ts";
 import type { TmuxServer } from "./shell.ts";
-import type { RecordOptions } from "./types.ts";
+import { DEFAULT_COLS, DEFAULT_ROWS, type RecordOptions } from "./types.ts";
 
 export interface RecordingHandle {
   asciinemaProc?: import("node:child_process").ChildProcess;
@@ -51,10 +51,13 @@ function buildAsciinemaCmd(
   const tmuxFlags = server.userConf ? "" : "-f /dev/null ";
   const attachCmd = `tmux -L ${sq(server.socketName)} ${tmuxFlags}attach -t ${sq(mainSession)}`;
   const headlessFlag = opts?.headless ? " --headless" : "";
-  const sizeFlag =
-    opts?.cols != null || opts?.rows != null
-      ? ` --window-size ${opts?.cols ?? ""}x${opts?.rows ?? ""}`
-      : "";
+  // In headful mode, add 1 to each dimension so the asciinema PTY is larger
+  // than the tmux window — tmux draws a line border in the 1-char gap.
+  // In headless mode, use the exact size for precise cast dimensions.
+  const pad = opts?.headless ? 0 : 1;
+  const wCols = (opts?.cols ?? DEFAULT_COLS) + pad;
+  const wRows = (opts?.rows ?? DEFAULT_ROWS) + pad;
+  const sizeFlag = ` --window-size ${wCols}x${wRows}`;
   return `asciinema rec --overwrite${headlessFlag}${sizeFlag} -c ${sq(attachCmd)} ${sq(absCast)}`;
 }
 

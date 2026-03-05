@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { ActionQueue, createSessionProxy, type QueueConfig } from "./queue.ts";
 import { startRecording, stopRecording } from "./recorder.ts";
@@ -7,7 +7,9 @@ import { createSession } from "./session.ts";
 import { TmuxServer } from "./shell.ts";
 import {
   DEFAULT_ACTION_DELAY_MS,
+  DEFAULT_COLS,
   DEFAULT_PACE_MS,
+  DEFAULT_ROWS,
   DEFAULT_TRAILING_DELAY_MS,
   DEFAULT_TYPING_DELAY_MS,
   type RecordOptions,
@@ -16,6 +18,26 @@ import {
 } from "./types.ts";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Rewrite the cols/rows in a v2/v3 asciicast header to the intended size. */
+function patchCastHeader(path: string, cols: number, rows: number): void {
+  try {
+    const content = readFileSync(path, "utf-8");
+    const nl = content.indexOf("\n");
+    if (nl === -1) return;
+    const header = JSON.parse(content.slice(0, nl));
+    if (header.term) {
+      header.term.cols = cols;
+      header.term.rows = rows;
+    } else if (header.width != null) {
+      header.width = cols;
+      header.height = rows;
+    }
+    writeFileSync(path, JSON.stringify(header) + content.slice(nl));
+  } catch {
+    // Best-effort — don't fail the recording if patching fails
+  }
+}
 
 /**
  * Execute a single recording script against a real tmux + asciinema session.
@@ -80,8 +102,8 @@ export async function executeRecording(
 
     const runnerCfg: RunnerConfig = {
       mode,
-      cols: opts.cols ?? 100,
-      rows: opts.rows ?? 40,
+      cols: opts.cols ?? DEFAULT_COLS,
+      rows: opts.rows ?? DEFAULT_ROWS,
       typingDelay,
       actionDelay,
       trailingDelay: trailing,
@@ -100,5 +122,16 @@ export async function executeRecording(
     await srv.disconnect();
     await stopRecording(srv, name, recording);
     if (ownsServer) await srv.destroy();
+
+    // In headful mode the asciinema PTY is padded by 1 in each dimension
+    // so tmux draws a visible border around the recording area. Patch the
+    // cast header back to the intended dimensions.
+    if ((opts.mode ?? "headful") !== "headless") {
+      patchCastHeader(
+        castFile,
+        opts.cols ?? DEFAULT_COLS,
+        opts.rows ?? DEFAULT_ROWS,
+      );
+    }
   }
 }

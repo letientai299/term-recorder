@@ -73,19 +73,14 @@ export async function executeRecording(
   const mode = opts.mode ?? "headful";
   const castCols = opts.cols ?? DEFAULT_COLS;
   const castRows = opts.rows ?? DEFAULT_ROWS;
-  // In headful mode the tmux window is 1 smaller in each dimension so tmux
-  // draws a visible border within the cast frame. Scripts get the usable
-  // (inner) dimensions, not the cast dimensions.
   const headful = mode !== "headless";
-  const usableCols = headful ? castCols - 1 : castCols;
-  const usableRows = headful ? castRows - 1 : castRows;
 
   let recording: Awaited<ReturnType<typeof startRecording>> | undefined;
   try {
     await createSession(srv, name, {
       ...opts,
-      cols: usableCols,
-      rows: usableRows,
+      cols: castCols,
+      rows: castRows,
     });
 
     // Connect control mode early so startRecording's pollPane calls get %output hints
@@ -119,8 +114,8 @@ export async function executeRecording(
 
     const runnerCfg: RunnerConfig = {
       mode,
-      cols: usableCols,
-      rows: usableRows,
+      cols: castCols,
+      rows: castRows,
       typingDelay,
       actionDelay,
       trailingDelay: trailing,

@@ -48,6 +48,8 @@ export interface RecordOptions {
   trailingDelay?: number;
   /** Default per-pane pace delay in ms. Default: 1000. Set to 0 to disable. */
   pace?: number;
+  /** Recording name shown in headless log lines. Populated automatically by {@link main}. */
+  recordingName?: string;
 }
 
 import type { Key } from "./keys.ts";

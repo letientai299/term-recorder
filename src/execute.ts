@@ -111,6 +111,8 @@ export async function executeRecording(
       actionDelay,
       headless: mode === "headless",
       pace,
+      recordingName: opts.recordingName,
+      sessionName: name,
     };
     const queue = new ActionQueue(srv, queueCfg);
     const session = createSessionProxy(queue, name);

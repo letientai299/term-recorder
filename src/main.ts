@@ -335,7 +335,9 @@ export async function main(
     `Recording ${filtered.length} cast${filtered.length > 1 ? "s" : ""} → ${outputDir} (${opts.mode}, concurrency: ${concurrency})`,
   );
 
-  const tasks = filtered.map((rec) => () => runOne(rec, opts, outputDir));
+  const tasks = filtered.map(
+    (rec) => () => runOne(rec, { ...opts, recordingName: rec.name }, outputDir),
+  );
   const results = await runWithConcurrency(tasks, concurrency);
   reportResults(results);
 }

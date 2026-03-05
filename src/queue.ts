@@ -18,10 +18,17 @@ export interface QueueConfig {
   actionDelay: number;
   headless: boolean;
   pace: number;
+  /** Recording name shown in headless log lines. */
+  recordingName?: string;
+  /** Tmux session name stripped from pane targets in logs. */
+  sessionName?: string;
 }
 
 function log(cfg: QueueConfig, msg: string): void {
-  if (cfg.headless) console.log(`[rec] ${msg}`);
+  if (cfg.headless) {
+    const tag = cfg.recordingName ?? "rec";
+    console.log(`[${tag}] ${msg}`);
+  }
 }
 
 let splitCounter = 0;
@@ -56,7 +63,7 @@ export class ActionQueue {
     ) {
       const action = this.actions[this.drainIndex];
       if (!action) break;
-      await this.execute(action);
+      await this.execute(action, this.drainIndex, this.actions.length);
       // Auto-pause between actions (skip for sleep and pace)
       if (
         action.kind !== "sleep" &&
@@ -144,7 +151,14 @@ export class ActionQueue {
     },
   };
 
-  private logAction(action: Action): void {
+  /** Strip the session name prefix from a pane/session target for shorter logs. */
+  private shortTarget(raw: string): string {
+    const prefix = this.cfg.sessionName;
+    if (prefix && raw.startsWith(prefix)) return raw.slice(prefix.length);
+    return raw;
+  }
+
+  private logAction(action: Action, index: number, total: number): void {
     const detail =
       "text" in action
         ? `"${action.text}"`
@@ -155,17 +169,26 @@ export class ActionQueue {
             : "ms" in action
               ? `${action.ms}ms`
               : "";
-    const target =
+    const raw =
       "pane" in action
-        ? `→ ${action.pane}`
+        ? action.pane
         : "session" in action
-          ? `→ ${action.session}`
+          ? action.session
           : "";
-    log(this.cfg, [action.kind, detail, target].filter(Boolean).join(" "));
+    const target = raw ? `→ ${this.shortTarget(raw)}` : "";
+    const progress = `[${index + 1}/${total}]`;
+    log(
+      this.cfg,
+      [progress, action.kind, detail, target].filter(Boolean).join(" "),
+    );
   }
 
-  private async execute(action: Action): Promise<void> {
-    this.logAction(action);
+  private async execute(
+    action: Action,
+    index: number,
+    total: number,
+  ): Promise<void> {
+    this.logAction(action, index, total);
     const handler = this.handlers[action.kind];
     await (handler as (a: Action) => Promise<void>)(action);
   }

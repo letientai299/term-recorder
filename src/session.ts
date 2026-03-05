@@ -4,9 +4,14 @@ import type { RecordOptions } from "./types.ts";
 export async function createSession(
   server: TmuxServer,
   name: string,
-  opts?: Pick<RecordOptions, "env" | "cwd" | "tmux" | "shell">,
+  opts?: Pick<
+    RecordOptions,
+    "cols" | "rows" | "env" | "cwd" | "tmux" | "shell"
+  >,
 ): Promise<void> {
-  const args = ["new-session", "-d", "-s", name, "-x", "100", "-y", "40"];
+  const cols = String(opts?.cols ?? 100);
+  const rows = String(opts?.rows ?? 40);
+  const args = ["new-session", "-d", "-s", name, "-x", cols, "-y", rows];
   if (opts?.cwd) args.push("-c", opts.cwd);
   // shell-command must be last — runs in the initial pane
   if (opts?.shell) args.push(opts.shell);
@@ -28,6 +33,9 @@ export async function createSession(
   }
   // Disable status bar so it doesn't eat a row or cause line-wrap issues
   await server.tmux("set-option", "-t", name, "status", "off");
+  // Prevent tmux from resizing windows to match the attaching client
+  await server.tmux("set-option", "-t", name, "-w", "window-size", "manual");
+  await server.tmux("resize-window", "-t", name, "-x", cols, "-y", rows);
 
   if (opts?.tmux?.options) {
     for (const [key, value] of Object.entries(opts.tmux.options)) {

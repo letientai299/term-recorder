@@ -46,12 +46,16 @@ function buildAsciinemaCmd(
   server: TmuxServer,
   mainSession: string,
   absCast: string,
-  opts?: { headless?: boolean },
+  opts?: { headless?: boolean; cols?: number; rows?: number },
 ): string {
   const tmuxFlags = server.userConf ? "" : "-f /dev/null ";
   const attachCmd = `tmux -L ${sq(server.socketName)} ${tmuxFlags}attach -t ${sq(mainSession)}`;
   const headlessFlag = opts?.headless ? " --headless" : "";
-  return `asciinema rec --overwrite${headlessFlag} -c ${sq(attachCmd)} ${sq(absCast)}`;
+  const sizeFlag =
+    opts?.cols != null || opts?.rows != null
+      ? ` --window-size ${opts?.cols ?? ""}x${opts?.rows ?? ""}`
+      : "";
+  return `asciinema rec --overwrite${headlessFlag}${sizeFlag} -c ${sq(attachCmd)} ${sq(absCast)}`;
 }
 
 async function startHeadful(
@@ -92,13 +96,17 @@ export async function startRecording(
   server: TmuxServer,
   mainSession: string,
   castFile: string,
-  opts?: Pick<RecordOptions, "mode" | "loadAsciinemaConf">,
+  opts?: Pick<RecordOptions, "mode" | "cols" | "rows" | "loadAsciinemaConf">,
 ): Promise<RecordingHandle> {
   const mode = opts?.mode ?? "headful";
   const headless = mode === "headless";
   const absCast = resolve(castFile);
   const asc = asciinemaEnv(opts?.loadAsciinemaConf ?? false);
-  const cmd = buildAsciinemaCmd(server, mainSession, absCast, { headless });
+  const cmd = buildAsciinemaCmd(server, mainSession, absCast, {
+    headless,
+    cols: opts?.cols,
+    rows: opts?.rows,
+  });
 
   let asciinemaProc: RecordingHandle["asciinemaProc"];
   if (headless) {

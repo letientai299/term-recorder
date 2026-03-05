@@ -13,6 +13,8 @@ interface CliFlags {
   parallel?: number;
   outputDir?: string;
   filter?: string;
+  cols?: number;
+  rows?: number;
   loadTmuxConf: boolean;
   loadAsciinemaConf: boolean;
   dryRun: boolean;
@@ -29,6 +31,8 @@ export function parseCliFlags(argv: string[]): CliFlags {
       parallel: { type: "string", short: "p" },
       "output-dir": { type: "string", short: "o" },
       filter: { type: "string", short: "f" },
+      cols: { type: "string" },
+      rows: { type: "string" },
       "load-tmux-conf": { type: "boolean", default: false },
       "load-asciinema-conf": { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
@@ -51,6 +55,8 @@ export function parseCliFlags(argv: string[]): CliFlags {
     parallel: parseIntOpt(values.parallel),
     outputDir: values["output-dir"] as string | undefined,
     filter: values.filter as string | undefined,
+    cols: parseIntOpt(values.cols),
+    rows: parseIntOpt(values.rows),
     loadTmuxConf: values["load-tmux-conf"],
     loadAsciinemaConf: values["load-asciinema-conf"],
     dryRun: values["dry-run"],
@@ -65,6 +71,8 @@ export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
   return {
     ...base,
     mode: cli.headless ? "headless" : (config.mode ?? "headful"),
+    cols: cli.cols ?? config.cols,
+    rows: cli.rows ?? config.rows,
     loadTmuxConf: cli.loadTmuxConf || (config.loadTmuxConf ?? false),
     loadAsciinemaConf:
       cli.loadAsciinemaConf || (config.loadAsciinemaConf ?? false),
@@ -81,6 +89,8 @@ const CLI_OPTIONS: Array<[flags: string, arg: string, desc: string]> = [
   ["-p, --parallel", "N", "Max parallel recordings"],
   ["-o, --output-dir", "DIR", "Output directory (default: ./casts)"],
   ["-f, --filter", "REGEX", "Filter recordings by name"],
+  ["--cols", "N", "Terminal columns (default: 100)"],
+  ["--rows", "N", "Terminal rows (default: 40)"],
   ["--load-tmux-conf", "", "Load user's tmux.conf"],
   ["--load-asciinema-conf", "", "Load user's asciinema config"],
   ["--trailing-delay", "MS", "Idle time after last action (default: 1000)"],

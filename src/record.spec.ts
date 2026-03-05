@@ -18,7 +18,7 @@ describe("record (e2e)", () => {
       { mode: "headless", trailingDelay: 0, pace: 0 },
       (s) => {
         s.type("echo hello-from-record").enter();
-        s.sleep(1);
+        s.waitForText("hello-from-record");
       },
     );
 

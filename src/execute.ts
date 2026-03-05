@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { ActionQueue, createSessionProxy, type QueueConfig } from "./queue.ts";
 import { startRecording, stopRecording } from "./recorder.ts";
@@ -18,6 +18,28 @@ import {
 } from "./types.ts";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Append a final cast event that resets the scroll region (DECSTBM).
+ * tmux sets a scroll region during the session, and players replay it
+ * verbatim into the viewer's terminal without clearing it on exit.
+ */
+function appendResetFrame(castFile: string): void {
+  const buf = readFileSync(castFile, "utf8");
+  const lastNewline = buf.lastIndexOf("\n", buf.length - 2);
+  if (lastNewline === -1) return;
+  const lastLine = buf.slice(lastNewline + 1).trimEnd();
+  let ts: number;
+  try {
+    ts = JSON.parse(lastLine)[0];
+  } catch {
+    return;
+  }
+  // \x1b[r resets DECSTBM to full terminal height
+  const frame = JSON.stringify([ts + 0.001, "o", "\x1b[r"]);
+  const sep = buf.endsWith("\n") ? "" : "\n";
+  appendFileSync(castFile, `${sep + frame}\n`);
+}
 
 /**
  * Execute a single recording script against a real tmux + asciinema session.
@@ -114,6 +136,15 @@ export async function executeRecording(
   } finally {
     await srv.disconnect();
     await stopRecording(srv, name, recording);
+    appendResetFrame(castFile);
+    // Headful asciinema inherits stdio and tmux enters alternate screen,
+    // sets a scroll region, and may hide the cursor. A kill-session won't
+    // cleanly undo these, so reset the host terminal:
+    //   \x1b[?1049l  exit alternate screen (restore main screen + scrollback)
+    //   \x1b[r       reset scroll region to full terminal height
+    //   \x1b[?25h    show cursor
+    //   \x1b[0m      reset text attributes
+    if (headful) process.stdout.write("\x1b[?1049l\x1b[r\x1b[?25h\x1b[0m");
     if (ownsServer) await srv.destroy();
   }
 }

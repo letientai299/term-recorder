@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      TERM: xterm-256color
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: bun install
+      - run: mise build
+      - name: Type-check
+        run: |
+          bun tsc --noEmit
+          bun tsc --noEmit --project tsconfig.build.json
+      - name: Lint
+        run: bunx biome check .
+      - run: mise test
+      - run: mise e2e

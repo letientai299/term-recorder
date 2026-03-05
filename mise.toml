@@ -18,7 +18,7 @@ run = "bun test"
 description = "All tests (unit + e2e)"
 
 [tasks.build]
-run = "bun tsc --project tsconfig.build.json"
+run = "bun run build"
 description = "Compile TypeScript to dist/"
 
 [tasks.lint]

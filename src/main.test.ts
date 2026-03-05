@@ -29,6 +29,8 @@ describe("parseCliFlags", () => {
     [["--dry-run"], "dryRun", true],
     [["--cols", "80"], "cols", 80],
     [["--rows", "24"], "rows", 24],
+    [["--typing-delay", "50"], "typingDelay", 50],
+    [["--action-delay", "100"], "actionDelay", 100],
   ] as const)("parses %j → %s", (args, field, expected) => {
     const flags = parseCliFlags([...args]);
     expect(flags[field]).toBe(expected);
@@ -56,10 +58,6 @@ describe("parseCliFlags", () => {
     expect(flags.filter).toBe("split");
     expect(flags.parallel).toBe(2);
     expect(flags.dryRun).toBe(true);
-  });
-
-  test("rejects unknown flags (strict mode)", () => {
-    expect(() => parseCliFlags(["--headles"])).toThrow();
   });
 
   test.each(["abc", "0"])(
@@ -127,6 +125,18 @@ describe("resolveOptions", () => {
     const opts = resolveOptions({}, defaultCli);
     expect(opts.cols).toBeUndefined();
     expect(opts.rows).toBeUndefined();
+  });
+
+  test("CLI --typing-delay/--action-delay override config", () => {
+    const cli = parseCliFlags([
+      "--typing-delay",
+      "50",
+      "--action-delay",
+      "100",
+    ]);
+    const opts = resolveOptions({ typingDelay: 30, actionDelay: 200 }, cli);
+    expect(opts.typingDelay).toBe(50);
+    expect(opts.actionDelay).toBe(100);
   });
 
   test("passes through config fields", () => {

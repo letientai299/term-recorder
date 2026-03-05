@@ -1,6 +1,7 @@
 import { cpus } from "node:os";
 import { join } from "node:path";
-import { parseArgs } from "node:util";
+import type { ArgsDef } from "citty";
+import { parseArgs as cittyParseArgs, defineCommand, renderUsage } from "citty";
 import type { Config } from "./config.ts";
 import { executeRecording } from "./execute.ts";
 import type { Recording } from "./recording.ts";
@@ -20,27 +21,111 @@ interface CliFlags {
   dryRun: boolean;
   trailingDelay?: number;
   pace?: number;
+  typingDelay?: number;
+  actionDelay?: number;
+}
+
+const argsDef = {
+  help: {
+    type: "boolean",
+    alias: "h",
+    description: "Show this help message",
+    default: false,
+  },
+  headless: {
+    type: "boolean",
+    description: "No visible terminal; auto-parallel at cpus/2",
+    default: false,
+  },
+  parallel: {
+    type: "string",
+    alias: "p",
+    description:
+      "Max concurrent recordings (default: 1, or cpus/2 if headless)",
+    valueHint: "N",
+  },
+  "output-dir": {
+    type: "string",
+    alias: "o",
+    description: "Output directory (default: ./casts)",
+    valueHint: "DIR",
+  },
+  filter: {
+    type: "string",
+    alias: "f",
+    description: "Run only recordings whose name matches this regex",
+    valueHint: "REGEX",
+  },
+  cols: {
+    type: "string",
+    description: "Terminal columns (default: 120)",
+    valueHint: "N",
+  },
+  rows: {
+    type: "string",
+    description: "Terminal rows (default: 30)",
+    valueHint: "N",
+  },
+  "load-tmux-conf": {
+    type: "boolean",
+    description: "Use your tmux.conf instead of a clean config",
+    default: false,
+  },
+  "load-asciinema-conf": {
+    type: "boolean",
+    description: "Use your asciinema config instead of defaults",
+    default: false,
+  },
+  "dry-run": {
+    type: "boolean",
+    description: "Print recording names and exit",
+    default: false,
+  },
+  "trailing-delay": {
+    type: "string",
+    description:
+      "Idle time before ending so the last frame stays visible (default: 1000)",
+    valueHint: "MS",
+  },
+  pace: {
+    type: "string",
+    description: "Delay after each pane action (default: 1000, 0 to disable)",
+    valueHint: "MS",
+  },
+  "typing-delay": {
+    type: "string",
+    description: "Per-character delay for type() actions (default: 30)",
+    valueHint: "MS",
+  },
+  "action-delay": {
+    type: "string",
+    description: "Auto-pause inserted between queued actions (default: 200)",
+    valueHint: "MS",
+  },
+} satisfies ArgsDef;
+
+/** Known long-flag names derived from argsDef, used to detect unknown flags. */
+const knownFlags = new Set<string>();
+for (const [key, def] of Object.entries(argsDef)) {
+  knownFlags.add(`--${key}`);
+  const alias = "alias" in def ? def.alias : undefined;
+  const aliases = Array.isArray(alias) ? alias : alias ? [alias] : [];
+  for (const a of aliases) {
+    knownFlags.add(a.length === 1 ? `-${a}` : `--${a}`);
+  }
 }
 
 export function parseCliFlags(argv: string[]): CliFlags {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      help: { type: "boolean", default: false, short: "h" },
-      headless: { type: "boolean", default: false },
-      parallel: { type: "string", short: "p" },
-      "output-dir": { type: "string", short: "o" },
-      filter: { type: "string", short: "f" },
-      cols: { type: "string" },
-      rows: { type: "string" },
-      "load-tmux-conf": { type: "boolean", default: false },
-      "load-asciinema-conf": { type: "boolean", default: false },
-      "dry-run": { type: "boolean", default: false },
-      "trailing-delay": { type: "string" },
-      pace: { type: "string" },
-    },
-    strict: true,
-  });
+  // Warn about unknown flags (citty silently drops them)
+  for (const arg of argv) {
+    if (arg === "--") break;
+    const flag = arg.split("=")[0] ?? arg;
+    if (arg.startsWith("-") && !knownFlags.has(flag)) {
+      console.warn(`Warning: unknown flag "${arg}"`);
+    }
+  }
+
+  const parsed = cittyParseArgs(argv, argsDef);
 
   const parseIntOpt = (v: unknown, min = 1): number | undefined => {
     if (v == null) return undefined;
@@ -50,74 +135,60 @@ export function parseCliFlags(argv: string[]): CliFlags {
   };
 
   return {
-    help: values.help,
-    headless: values.headless,
-    parallel: parseIntOpt(values.parallel),
-    outputDir: values["output-dir"] as string | undefined,
-    filter: values.filter as string | undefined,
-    cols: parseIntOpt(values.cols),
-    rows: parseIntOpt(values.rows),
-    loadTmuxConf: values["load-tmux-conf"],
-    loadAsciinemaConf: values["load-asciinema-conf"],
-    dryRun: values["dry-run"],
-    trailingDelay: parseIntOpt(values["trailing-delay"], 0),
-    pace: parseIntOpt(values.pace, 0),
+    help: parsed.help ?? false,
+    headless: parsed.headless ?? false,
+    parallel: parseIntOpt(parsed.parallel),
+    outputDir: parsed["output-dir"],
+    filter: parsed.filter,
+    cols: parseIntOpt(parsed.cols),
+    rows: parseIntOpt(parsed.rows),
+    loadTmuxConf: parsed["load-tmux-conf"] ?? false,
+    loadAsciinemaConf: parsed["load-asciinema-conf"] ?? false,
+    dryRun: parsed["dry-run"] ?? false,
+    trailingDelay: parseIntOpt(parsed["trailing-delay"], 0),
+    pace: parseIntOpt(parsed.pace, 0),
+    typingDelay: parseIntOpt(parsed["typing-delay"], 0),
+    actionDelay: parseIntOpt(parsed["action-delay"], 0),
   };
 }
 
 /** @internal */
 export function resolveOptions(config: Config, cli: CliFlags): RecordOptions {
   const { outputDir: _, ...base } = config;
+  const cliOverrides: Partial<RecordOptions> = {
+    ...(cli.headless ? { mode: "headless" as const } : undefined),
+    ...(cli.cols != null ? { cols: cli.cols } : undefined),
+    ...(cli.rows != null ? { rows: cli.rows } : undefined),
+    ...(cli.loadTmuxConf ? { loadTmuxConf: true } : undefined),
+    ...(cli.loadAsciinemaConf ? { loadAsciinemaConf: true } : undefined),
+    ...(cli.trailingDelay != null
+      ? { trailingDelay: cli.trailingDelay }
+      : undefined),
+    ...(cli.pace != null ? { pace: cli.pace } : undefined),
+    ...(cli.typingDelay != null ? { typingDelay: cli.typingDelay } : undefined),
+    ...(cli.actionDelay != null ? { actionDelay: cli.actionDelay } : undefined),
+  };
   return {
     ...base,
-    mode: cli.headless ? "headless" : (config.mode ?? "headful"),
-    cols: cli.cols ?? config.cols,
-    rows: cli.rows ?? config.rows,
-    loadTmuxConf: cli.loadTmuxConf || (config.loadTmuxConf ?? false),
-    loadAsciinemaConf:
-      cli.loadAsciinemaConf || (config.loadAsciinemaConf ?? false),
-    trailingDelay: cli.trailingDelay ?? config.trailingDelay,
-    pace: cli.pace ?? config.pace,
+    mode: config.mode ?? "headful",
+    loadTmuxConf: config.loadTmuxConf ?? false,
+    loadAsciinemaConf: config.loadAsciinemaConf ?? false,
+    ...cliOverrides,
   };
 }
 
 const DEFAULT_OUTPUT_DIR = "./casts";
 
-const CLI_OPTIONS: Array<[flags: string, arg: string, desc: string]> = [
-  ["-h, --help", "", "Show this help message"],
-  ["--headless", "", "Run headless with auto-parallel (cpus/2)"],
-  ["-p, --parallel", "N", "Max parallel recordings"],
-  ["-o, --output-dir", "DIR", "Output directory (default: ./casts)"],
-  ["-f, --filter", "REGEX", "Filter recordings by name"],
-  ["--cols", "N", "Terminal columns (default: 120)"],
-  ["--rows", "N", "Terminal rows (default: 30)"],
-  ["--load-tmux-conf", "", "Load user's tmux.conf"],
-  ["--load-asciinema-conf", "", "Load user's asciinema config"],
-  ["--trailing-delay", "MS", "Idle time after last action (default: 1000)"],
-  ["--pace", "MS", "Default per-pane pace delay (default: 1000, 0 to disable)"],
-  ["--dry-run", "", "Print recording names and exit"],
-];
+const cliCommand = defineCommand({
+  meta: {
+    name: "term-recorder",
+    description: "Record terminal demos to asciicast files.",
+  },
+  args: argsDef,
+});
 
-function formatHelp(recordings: Recording[], outputDir: string): string {
-  const outputs = recordings
-    .map((r) => `  ${join(outputDir, `${r.name}.cast`)}`)
-    .join("\n");
-
-  const PAD = 28;
-  const options = CLI_OPTIONS.map(([flags, arg, desc]) => {
-    const left = arg.length > 0 ? `${flags} ${arg}` : flags;
-    return `  ${left.padEnd(PAD)}${desc}`;
-  }).join("\n");
-
-  return [
-    "Record terminal demos to asciicast files.",
-    "",
-    "Usage: bun <script> [options]",
-    "",
-    outputs,
-    "",
-    options,
-  ].join("\n");
+async function formatHelp(): Promise<string> {
+  return await renderUsage(cliCommand);
 }
 
 interface RecordingResult {
@@ -247,7 +318,7 @@ export async function main(
   const outputDir = cli.outputDir ?? config.outputDir ?? DEFAULT_OUTPUT_DIR;
 
   if (cli.help) {
-    console.log(formatHelp(recordings, outputDir));
+    console.log(await formatHelp());
     return;
   }
 

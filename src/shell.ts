@@ -79,37 +79,18 @@ class LineReader {
 /**
  * Quote an argument for tmux control mode command parsing.
  *
- * Uses `{braces}` quoting (tmux 2.0+) which passes content verbatim.
- * Falls back to single-quote escaping for args containing `#{` format
- * sequences (braces suppress expansion) or unbalanced braces.
+ * Always uses single-quote escaping. Tmux `{braces}` quoting is NOT safe
+ * for arbitrary content — the braced body goes through tmux's full lexer
+ * where `#`, `"`, `'`, `%`, `\`, `$`, `~`, and `;` all have special meaning.
+ * See https://github.com/tmux/tmux/issues/2841
  */
 /** @internal */
 export function quoteCcArg(arg: string): string {
   if (arg.length === 0) return "''";
-
-  // Flags starting with - must use single-quote escaping; tmux treats
-  // {-flag} as a command block, not a quoted argument.
-  if (arg.startsWith("-")) return `'${arg.replace(/'/g, "'\\''")}'`;
-
-  const needsQuoting = /[\s"'\\#{}$;~]/.test(arg);
-  if (!needsQuoting) return arg;
-
-  // Format sequences like #{pane_id} must expand — braces suppress that.
-  // Args with whitespace can't use braces — tmux tokenizes on spaces first.
-  // Semicolons can't use braces — tmux parses {;} as a command block.
-  const hasFormat = arg.includes("#{");
-  const canBrace = !hasFormat && !/[\s;']/.test(arg);
-  // Unbalanced braces can't use {braces} quoting
-  const balanced =
-    canBrace &&
-    arg
-      .split("")
-      .reduce((d, c) => (c === "{" ? d + 1 : c === "}" ? d - 1 : d), 0) === 0;
-
-  if (canBrace && balanced) return `{${arg}}`;
-
-  // Single-quote escape fallback
-  return `'${arg.replace(/'/g, "'\\''")}'`;
+  if (/[\s"'\\#{}$;~%]/.test(arg) || arg.startsWith("-")) {
+    return `'${arg.replace(/'/g, "'\\''")}'`;
+  }
+  return arg;
 }
 
 /**

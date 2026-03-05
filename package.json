@@ -1,6 +1,6 @@
 {
   "name": "@letientai299/term-recorder",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scriptable terminal recordings — write TypeScript to drive tmux sessions and produce asciicast files",
   "type": "module",
   "exports": {

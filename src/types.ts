@@ -1,5 +1,5 @@
-/** 160 WPM × 5 chars/word ÷ 60s = 10 chars/s → 75ms per char */
-export const DEFAULT_TYPING_DELAY_MS = 75;
+/** ~400 WPM — fast enough for scripted recordings, slow enough to follow */
+export const DEFAULT_TYPING_DELAY_MS = 30;
 
 /** Auto-pause between actions (ms). 0 = no pause. */
 export const DEFAULT_ACTION_DELAY_MS = 200;

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { executeRecording } from "./execute.ts";
 import { castContains, castHeader } from "./test-helpers.ts";
 
-const CAST_FILE = "/tmp/test-record.cast";
+const CAST_FILE = join(tmpdir(), "test-record.cast");
 
 afterEach(() => {
   if (existsSync(CAST_FILE)) unlinkSync(CAST_FILE);

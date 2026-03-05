@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { executeRecording } from "./execute.ts";
 import { castContains } from "./test-helpers.ts";
 import type { RecordOptions } from "./types.ts";
@@ -21,7 +23,7 @@ function uniqueId(label: string): string {
 }
 
 function uniqueCast(label: string): string {
-  const file = `/tmp/test-api-${uniqueId(label)}.cast`;
+  const file = join(tmpdir(), `test-api-${uniqueId(label)}.cast`);
   castFiles.push(file);
   return file;
 }

@@ -6,6 +6,8 @@ constraints, including nested recording (`examples/inception.ts`).
 
 ## Design goals
 
+See [about.md][about] for target audience and high-level goals.
+
 - Drive a **real PTY** via `tmux`, not a mocked terminal.
 - Keep scripting API **declarative** (queue first, execute later).
 - Record output as **asciicast v3** via `asciinema` CLI 3.x.
@@ -215,6 +217,7 @@ Related references:
 - [Readiness Detection][readiness]
 - [examples/inception.ts][inception]
 
+[about]: ./about.md
 [readme-how]: ../README.md#how-it-works
 [taxonomy]: ./terminal-programs.md
 [readiness]: ./readiness-detection.md

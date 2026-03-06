@@ -23,11 +23,17 @@ Input is delivered character-by-character (no line buffering), but signal
 processing stays enabled — Ctrl-C still sends SIGINT, and flow control (Ctrl-S /
 Ctrl-Q) still works. Output processing is also left unchanged.
 
-Cbreak is conceptually between canonical and raw mode. Few modern TUI frameworks
-use it — most go straight to raw mode and handle signals in application code
-(see below). [Textual][textual] is a notable exception: it defaults to raw mode
-but supports a `TEXTUAL_ALLOW_SIGNALS` environment variable that keeps ISIG
-enabled, effectively switching to cbreak.
+Cbreak is conceptually between canonical and raw mode. GNU [readline][] uses
+cbreak: it clears `ICANON` and `ECHO` but [keeps ISIG set][rl-rltty], so Ctrl-C
+still generates SIGINT via the kernel. Readline installs its own signal handlers
+to restore terminal state before re-raising. Programs that link readline (bash,
+Python ≤ 3.12 REPL, Python ≥ 3.13 [PyREPL][pyrepl] via `tty.setcbreak`) inherit
+this behavior.
+
+Most other TUI frameworks go straight to raw mode and handle signals in
+application code (see below). [Textual][textual] is a notable exception: it
+defaults to raw mode but supports a `TEXTUAL_ALLOW_SIGNALS` environment variable
+that keeps ISIG enabled, effectively switching to cbreak.
 
 ## Raw Mode
 
@@ -43,19 +49,19 @@ Full-screen programs (vim, tmux, less), REPLs, and AI coding agents all use it.
 Each framework reaches raw mode through a different path but the termios flags
 end up equivalent:
 
-| Framework                                   | Language | Notable users            | How it enters raw mode                                                      |
-| ------------------------------------------- | -------- | ------------------------ | --------------------------------------------------------------------------- |
-| [Ink][ink]                                  | JS/TS    | Claude Code, Gemini CLI  | Node.js `setRawMode(true)` → libuv clears `ECHO\|ICANON\|IEXTEN\|ISIG`      |
-| [Ratatui][ratatui] + [Crossterm][crossterm] | Rust     | Codex CLI (Rust rewrite) | `cfmakeraw` via rustix (or libc)                                            |
-| [Bubble Tea][bubbletea]                     | Go       | OpenCode                 | `charmbracelet/x/term.MakeRaw` replicates `cfmakeraw`                       |
-| [prompt_toolkit][prompt_toolkit]            | Python   | Aider                    | Clears `ECHO\|ICANON\|IEXTEN\|ISIG` and `IXON\|IXOFF\|ICRNL` via termios    |
-| [Textual][textual]                          | Python   | —                        | Same flags as prompt_toolkit; `TEXTUAL_ALLOW_SIGNALS` optionally keeps ISIG |
-| [readline][readline]                        | C        | Bash, Python REPL        | `cfmakeraw`-equivalent via termios                                          |
+| Framework                                   | Language | Notable users            | How it enters raw mode                                                               |
+| ------------------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| [Ink][ink]                                  | JS/TS    | Claude Code, Gemini CLI  | Node.js `setRawMode(true)` → [libuv][libuv-tty] clears `ECHO\|ICANON\|IEXTEN\|ISIG`  |
+| [Ratatui][ratatui] + [Crossterm][crossterm] | Rust     | Codex CLI (Rust rewrite) | `cfmakeraw` via rustix (or libc)                                                     |
+| [Bubble Tea][bubbletea]                     | Go       | OpenCode                 | `charmbracelet/x/term.MakeRaw` replicates `cfmakeraw`                                |
+| [prompt_toolkit][prompt_toolkit]            | Python   | Aider                    | [Clears][pt-vt100] `ECHO\|ICANON\|IEXTEN\|ISIG` and `IXON\|IXOFF\|ICRNL` via termios |
+| [Textual][textual]                          | Python   | —                        | Same flags as prompt_toolkit; `TEXTUAL_ALLOW_SIGNALS` optionally keeps ISIG          |
 
-All of these handle Ctrl-C in application code rather than relying on kernel
-SIGINT. Bubble Tea's `WithoutSignals`/`WithoutSignalHandler` options control
-Go-level signal handlers, not termios ISIG — the terminal itself is always in
-raw mode.
+GNU [readline][] is a notable absence — it uses cbreak mode, not raw (see
+[Cbreak section above](#cbreak-rare-mode)). All frameworks in this table handle
+Ctrl-C in application code rather than relying on kernel SIGINT. Bubble Tea's
+`WithoutSignals`/`WithoutSignalHandler` options control Go-level signal
+handlers, not termios ISIG — the terminal itself is always in raw mode.
 
 Codex CLI originally used Ink (TypeScript) and later migrated to Ratatui (Rust).
 The terminal mode did not change — both use raw mode.
@@ -169,3 +175,9 @@ host terminal limitations.
 [win-terminal]: https://github.com/microsoft/terminal
 [term-155]: https://github.com/microsoft/terminal/issues/155
 [wsl-933]: https://github.com/microsoft/WSL/issues/933
+[rl-rltty]:
+  https://cgit.git.savannah.gnu.org/cgit/readline.git/tree/rltty.c?h=readline-8.2
+[pt-vt100]:
+  https://github.com/prompt-toolkit/python-prompt-toolkit/blob/3.0.52/src/prompt_toolkit/input/vt100.py
+[libuv-tty]: https://github.com/libuv/libuv/blob/v1.50.0/src/unix/tty.c
+[pyrepl]: https://peps.python.org/pep-0762/
